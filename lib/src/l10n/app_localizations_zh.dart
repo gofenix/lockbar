@@ -35,7 +35,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get permissionDeniedDescription =>
-      '打开“系统设置”中的“隐私与安全性 > 辅助功能”，启用 LockBar，然后返回这里或再次点击菜单栏图标。';
+      '打开“系统设置”中的“隐私与安全性 > 辅助功能”，启用 LockBar，然后返回这里或再次点击菜单栏图标。如果刚授权后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get permissionNotDeterminedTitle => '需要先授予一次权限';
@@ -121,14 +121,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusTrayActionFailed => 'LockBar 无法完成这次菜单栏点击操作。';
 
   @override
-  String get statusAccessibilityStillOff => '辅助功能权限仍未开启。请先在系统设置中启用，然后再试一次。';
+  String get statusAccessibilityStillOff =>
+      '辅助功能权限仍未开启。请先在系统设置中启用，然后再试一次。如果你刚刚完成授权但系统还没刷新，请退出并重新打开 LockBar。';
 
   @override
   String get statusLockServiceUnavailable => 'LockBar 无法连接到 macOS 锁屏服务。';
 
   @override
   String get statusOpenedSystemSettings =>
-      '已打开系统设置。请在“隐私与安全性 > 辅助功能”中启用 LockBar。';
+      '已打开系统设置。请在“隐私与安全性 > 辅助功能”中启用 LockBar。如果启用后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get statusOpenSystemSettingsFailed => 'LockBar 无法自动打开系统设置。';
@@ -148,7 +149,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statusPermissionEnableThenRetry =>
-      'LockBar 需要辅助功能权限才能锁屏。请先在系统设置中启用，然后再试一次。';
+      'LockBar 需要辅助功能权限才能锁屏。请先在系统设置中启用，然后再试一次。如果刚授权后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get statusLockCommandSent => '已发送锁屏指令。';
@@ -197,7 +198,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get permissionDeniedDescription =>
-      '打开“系统设置”中的“隐私与安全性 > 辅助功能”，启用 LockBar，然后返回这里或再次点击菜单栏图标。';
+      '打开“系统设置”中的“隐私与安全性 > 辅助功能”，启用 LockBar，然后返回这里或再次点击菜单栏图标。如果刚授权后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get permissionNotDeterminedTitle => '需要先授予一次权限';
@@ -283,14 +284,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get statusTrayActionFailed => 'LockBar 无法完成这次菜单栏点击操作。';
 
   @override
-  String get statusAccessibilityStillOff => '辅助功能权限仍未开启。请先在系统设置中启用，然后再试一次。';
+  String get statusAccessibilityStillOff =>
+      '辅助功能权限仍未开启。请先在系统设置中启用，然后再试一次。如果你刚刚完成授权但系统还没刷新，请退出并重新打开 LockBar。';
 
   @override
   String get statusLockServiceUnavailable => 'LockBar 无法连接到 macOS 锁屏服务。';
 
   @override
   String get statusOpenedSystemSettings =>
-      '已打开系统设置。请在“隐私与安全性 > 辅助功能”中启用 LockBar。';
+      '已打开系统设置。请在“隐私与安全性 > 辅助功能”中启用 LockBar。如果启用后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get statusOpenSystemSettingsFailed => 'LockBar 无法自动打开系统设置。';
@@ -310,7 +312,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get statusPermissionEnableThenRetry =>
-      'LockBar 需要辅助功能权限才能锁屏。请先在系统设置中启用，然后再试一次。';
+      'LockBar 需要辅助功能权限才能锁屏。请先在系统设置中启用，然后再试一次。如果刚授权后仍未生效，请退出并重新打开 LockBar。';
 
   @override
   String get statusLockCommandSent => '已发送锁屏指令。';

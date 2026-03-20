@@ -36,7 +36,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get permissionDeniedDescription =>
-      'Open System Settings, go to Privacy & Security > Accessibility, enable LockBar, then return here or click the tray icon again.';
+      'Open System Settings, go to Privacy & Security > Accessibility, enable LockBar, then return here or click the tray icon again. If it still does not take effect, quit and reopen LockBar.';
 
   @override
   String get permissionNotDeterminedTitle => 'Permission is needed once';
@@ -131,7 +131,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusAccessibilityStillOff =>
-      'Accessibility access is still off. Enable it in System Settings, then try again.';
+      'Accessibility access is still off. Enable it in System Settings, then try again. If you just enabled it and macOS has not refreshed yet, quit and reopen LockBar.';
 
   @override
   String get statusLockServiceUnavailable =>
@@ -139,7 +139,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusOpenedSystemSettings =>
-      'System Settings was opened. Enable LockBar under Privacy & Security > Accessibility.';
+      'System Settings was opened. Enable LockBar under Privacy & Security > Accessibility. If the change does not take effect afterward, quit and reopen LockBar.';
 
   @override
   String get statusOpenSystemSettingsFailed =>
@@ -163,7 +163,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusPermissionEnableThenRetry =>
-      'LockBar needs Accessibility access before it can lock your Mac. Enable it in System Settings, then try again.';
+      'LockBar needs Accessibility access before it can lock your Mac. Enable it in System Settings, then try again. If you just enabled it and it still does not work, quit and reopen LockBar.';
 
   @override
   String get statusLockCommandSent => 'Lock command sent.';
