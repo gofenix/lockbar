@@ -33,8 +33,12 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>LockBar can read nearby calendar titles and times when you explicitly enable calendar suggestions.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>LockBar can watch Bluetooth device changes when you explicitly enable that suggestion source.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

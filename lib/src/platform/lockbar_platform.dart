@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'dart:async';
 
+import '../models/ai_models.dart';
 import '../models/lockbar_models.dart';
 
 abstract class LockbarPlatform {
@@ -19,10 +21,49 @@ abstract class LockbarPlatform {
   Future<AppInfo> getAppInfo();
 
   Future<void> setNativeLocale(Locale locale);
+
+  Future<SystemContextSnapshot> getSystemContextSnapshot({
+    Set<AiDataSource> sources = const <AiDataSource>{},
+  });
+
+  Future<PermissionState> getCalendarPermissionState();
+
+  Future<PermissionRequestResult> requestCalendarAccess();
+
+  Stream<SuggestionPanelAction> get suggestionPanelActions;
+
+  Future<void> showSuggestionPanel(SuggestionPanelData data);
+
+  Future<void> updateSuggestionPanel(SuggestionPanelData data);
+
+  Future<void> hideSuggestionPanel();
 }
 
 class MethodChannelLockbarPlatform implements LockbarPlatform {
   static const MethodChannel _channel = MethodChannel('lockbar/macos');
+  static final StreamController<SuggestionPanelAction> _panelActionsController =
+      StreamController<SuggestionPanelAction>.broadcast();
+  static bool _handlerInitialized = false;
+
+  MethodChannelLockbarPlatform() {
+    if (_handlerInitialized) {
+      return;
+    }
+    _handlerInitialized = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method != 'suggestionPanelAction') {
+        throw PlatformException(
+          code: 'unsupported_callback',
+          message: 'Unsupported native callback: ${call.method}',
+        );
+      }
+
+      final arguments = call.arguments as Map<dynamic, dynamic>? ?? const {};
+      final rawAction = arguments['action'] as String?;
+      final action = _parseSuggestionPanelAction(rawAction);
+      _panelActionsController.add(action);
+    });
+  }
 
   @override
   Future<PermissionState> getPermissionState() async {
@@ -82,6 +123,52 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
     });
   }
 
+  @override
+  Future<SystemContextSnapshot> getSystemContextSnapshot({
+    Set<AiDataSource> sources = const <AiDataSource>{},
+  }) async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      'getSystemContextSnapshot',
+      {'sources': sources.map((source) => source.storageKey).toList()},
+    );
+    return SystemContextSnapshot.fromMap(result);
+  }
+
+  @override
+  Future<PermissionState> getCalendarPermissionState() async {
+    final rawState = await _channel.invokeMethod<String>(
+      'getCalendarPermissionState',
+    );
+    return _parsePermissionState(rawState);
+  }
+
+  @override
+  Future<PermissionRequestResult> requestCalendarAccess() async {
+    final rawResult = await _channel.invokeMethod<String>(
+      'requestCalendarAccess',
+    );
+    return _parsePermissionRequestResult(rawResult);
+  }
+
+  @override
+  Stream<SuggestionPanelAction> get suggestionPanelActions =>
+      _panelActionsController.stream;
+
+  @override
+  Future<void> showSuggestionPanel(SuggestionPanelData data) {
+    return _channel.invokeMethod<void>('showSuggestionPanel', data.toMap());
+  }
+
+  @override
+  Future<void> updateSuggestionPanel(SuggestionPanelData data) {
+    return _channel.invokeMethod<void>('updateSuggestionPanel', data.toMap());
+  }
+
+  @override
+  Future<void> hideSuggestionPanel() {
+    return _channel.invokeMethod<void>('hideSuggestionPanel');
+  }
+
   PermissionState _parsePermissionState(String? rawState) {
     switch (rawState) {
       case 'granted':
@@ -103,6 +190,7 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
     switch (rawResult) {
       case 'granted':
         return PermissionRequestResult.granted;
+      case 'notDetermined':
       case 'denied':
       case null:
         return PermissionRequestResult.denied;
@@ -140,6 +228,19 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
       'eventSourceUnavailable' => LockFailureCode.eventSourceUnavailable,
       'eventSequenceUnavailable' => LockFailureCode.eventSequenceUnavailable,
       _ => LockFailureCode.unknown,
+    };
+  }
+
+  SuggestionPanelAction _parseSuggestionPanelAction(String? rawAction) {
+    return switch (rawAction) {
+      'lockNow' => SuggestionPanelAction.lockNow,
+      'later' => SuggestionPanelAction.later,
+      'notNow' => SuggestionPanelAction.notNow,
+      'hide' => SuggestionPanelAction.hide,
+      _ => throw PlatformException(
+        code: 'invalid_suggestion_panel_action',
+        message: 'Unsupported suggestion panel action: $rawAction',
+      ),
     };
   }
 }

@@ -20,6 +20,13 @@ class AppDelegate: FlutterAppDelegate {
     return true
   }
 
+  override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    if !flag {
+      showSettingsWindow(nil)
+    }
+    return true
+  }
+
   func updateNativeLocalization(localeTag: String?) {
     appMenuLocalizer.apply(
       menu: NSApp.mainMenu,

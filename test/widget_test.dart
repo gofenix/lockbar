@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lockbar/src/app.dart';
 import 'package:lockbar/src/lockbar_controller.dart';
+import 'package:lockbar/src/models/ai_models.dart';
 import 'package:lockbar/src/models/lockbar_models.dart';
 
 import 'test_doubles.dart';
@@ -17,26 +18,36 @@ void main() {
       platform: platform,
       launchAtStartupService: launchAtStartup,
       localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
       initialSystemLocale: const Locale('en'),
     );
 
     await tester.pumpWidget(LockbarApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('One click. Screen locked.'), findsOneWidget);
-    expect(find.text('Accessibility is still off'), findsOneWidget);
+    expect(find.text('LockBar'), findsOneWidget);
+    expect(find.text('Locking'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Launch at Login'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('Launch at Login'),
+      find.text('Privacy'),
       240,
       scrollable: find.byType(Scrollable),
     );
-    expect(find.text('Language'), findsOneWidget);
-    expect(find.text('Launch at Login'), findsOneWidget);
-
-    await tester.tap(find.text('Request Permission'));
+    expect(find.text('Privacy'), findsOneWidget);
+    expect(find.text('Accessibility is still off'), findsOneWidget);
+    final requestPermission = find.text('Request Permission');
+    await tester.ensureVisible(requestPermission);
+    await tester.pumpAndSettle();
+    await tester.tap(requestPermission, warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(platform.requestPermissionCalls, 1);
+    expect(find.text('Turn On Smart Suggestions'), findsOneWidget);
+    expect(find.text('Configure…'), findsOneWidget);
+    expect(find.text('Decision History'), findsOneWidget);
   });
 
   testWidgets('settings window renders Simplified Chinese when system is zh', (
@@ -46,20 +57,126 @@ void main() {
       platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
       launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
       localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
       initialSystemLocale: const Locale('zh'),
     );
 
     await tester.pumpWidget(LockbarApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('一键锁屏，立即生效。'), findsOneWidget);
-    expect(find.text('辅助功能权限仍未开启'), findsOneWidget);
+    expect(find.text('LockBar'), findsOneWidget);
+    expect(find.text('锁屏'), findsOneWidget);
+    expect(find.text('语言'), findsOneWidget);
+    expect(find.text('登录时启动'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('登录时启动'),
+      find.text('隐私'),
       240,
       scrollable: find.byType(Scrollable),
     );
-    expect(find.text('语言'), findsOneWidget);
-    expect(find.text('登录时启动'), findsOneWidget);
+    expect(find.text('辅助功能权限仍未开启'), findsOneWidget);
+    expect(find.text('开启智能建议'), findsOneWidget);
+    expect(find.text('配置…'), findsOneWidget);
+    expect(find.text('决策历史'), findsOneWidget);
+  });
+
+  testWidgets('AI configuration happens inside the dialog', (
+    WidgetTester tester,
+  ) async {
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
+      launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+    );
+
+    await tester.pumpWidget(LockbarApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Configure…'),
+      240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Configure…'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Configure AI Connection'), findsOneWidget);
+    expect(find.text('Draft test status'), findsOneWidget);
+    expect(find.text('Test'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+  });
+
+  testWidgets('AI history renders the latest trace details in settings', (
+    WidgetTester tester,
+  ) async {
+    final traceStore = FakeAiTraceStore()
+      ..traces = [
+        AiDecisionTrace(
+          id: 'trace-1',
+          occurredAt: DateTime(2026, 3, 28, 18),
+          trigger: AiTriggerType.workdayEnded,
+          localeTag: 'en',
+          enabledDataSources: const [
+            AiDataSource.actionHistory,
+            AiDataSource.idleState,
+          ],
+          collectedContext: SystemContextSnapshot(
+            collectedAt: DateTime(2026, 3, 28, 18),
+            idleSeconds: 18,
+            bluetoothDevices: const ['Keyboard'],
+            networkReachable: true,
+          ),
+          exchangeDebug: const AiInferenceExchangeDebug(
+            model: 'MiniMax-M2.7',
+            baseUrl: 'https://api.minimaxi.com/anthropic',
+            requestBody: {'model': 'MiniMax-M2.7'},
+            rawResponseText: '{"shouldSuggest":false}',
+            parsedResponse: {'shouldSuggest': false},
+          ),
+          outcome: AiDecisionTraceOutcome.noSuggestion,
+          outcomeReason: 'No suggestion because the signal mix was weak.',
+        ),
+      ];
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
+      launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      aiTraceStore: traceStore,
+      initialSystemLocale: const Locale('en'),
+    );
+
+    await tester.pumpWidget(LockbarApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Decision History'),
+      240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Decision History'), findsOneWidget);
+    expect(find.text('No suggestion'), findsWidgets);
+    expect(
+      find.text('No suggestion because the signal mix was weak.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.textContaining('Workday').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collected'), findsOneWidget);
+    expect(find.text('Sent to AI'), findsOneWidget);
+    expect(find.text('AI Returned'), findsOneWidget);
+    expect(find.text('Outcome'), findsOneWidget);
   });
 }

@@ -1,10 +1,30 @@
 {
   "@@locale": "en",
   "preparingLockBar": "Preparing LockBar…",
+  "settingsSubtitle": "Menu bar controls, permissions, and smart suggestions.",
   "heroTitle": "One click. Screen locked.",
   "heroDescription": "Left-click the menu bar item to lock instantly. Right-click to open the menu and manage startup behavior.",
   "leftClickLocks": "Left click locks",
   "rightClickOpensMenu": "Right click opens menu",
+  "lockingSectionTitle": "Locking",
+  "primaryActionTitle": "Primary click",
+  "primaryActionDescription": "Left click locks immediately. Secondary click opens commands.",
+  "primaryActionTipTitle": "First-run tip",
+  "primaryActionTipDescription": "Left click locks now. Secondary click opens commands.",
+  "gotItAction": "Got it",
+  "manualActionsTitle": "Manual actions",
+  "durationMinutesLabel": "{count} min",
+  "@durationMinutesLabel": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "durationSecondsLabel": "{count} sec",
+  "@durationSecondsLabel": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "permissionGrantedTitle": "Accessibility access is enabled",
   "permissionGrantedDescription": "LockBar can now synthesize the standard macOS lock shortcut from the menu bar without opening a full app window.",
   "permissionDeniedTitle": "Accessibility is still off",
@@ -53,5 +73,268 @@
   "statusLockFailureEventSource": "LockBar could not create the system keyboard event source.",
   "statusLockFailureEventSequence": "LockBar could not build the keyboard shortcut event sequence.",
   "statusLockFailureGeneric": "LockBar could not trigger the system lock shortcut.",
-  "statusLocalePreferenceFailed": "LockBar could not save the language preference."
+  "statusLocalePreferenceFailed": "LockBar could not save the language preference.",
+  "statusAiModeEnabled": "Smart suggestions are on.",
+  "statusAiModeDisabled": "Smart suggestions are off. LockBar will not collect context or contact the AI service.",
+  "statusAiSettingsSaveFailed": "LockBar could not save the AI settings.",
+  "statusAiConfigurationSaved": "AI connection saved locally.",
+  "statusAiConfigurationMissing": "AI is on, but the base URL or API key is missing. Open Settings and save the AI connection first.",
+  "statusAiConnectionVerificationRequired": "Configure, test, and save an AI connection before turning suggestions on.",
+  "statusAiConnectionTestSucceeded": "AI connection verified.",
+  "statusAiConnectionTestFailed": "LockBar could not verify the AI connection. Review the base URL, API key, and endpoint response, then test again.",
+  "statusAiRequestFailed": "LockBar could not reach the AI service. Check the API key, network, or Anthropic-compatible MiniMax endpoint.",
+  "statusAiInvalidResponse": "The AI service returned a response LockBar could not parse.",
+  "statusAiMemoryReset": "LockBar cleared the current memory profile and action history.",
+  "statusAiMemoryResetFailed": "LockBar could not reset the AI memory profile.",
+  "statusFocusSessionStarted": "Focus session started.",
+  "statusFocusSessionCancelled": "Focus session cancelled.",
+  "statusDelayedLockScheduled": "Delayed lock scheduled.",
+  "statusDelayedLockCancelled": "Delayed lock cancelled.",
+  "statusWorkdayReviewStarted": "Workday wrap-up started.",
+  "aiStatusOn": "AI on",
+  "aiStatusOff": "AI off",
+  "aiCardTitle": "Smart suggestion",
+  "aiCardSubtitle": "Private until you turn it on",
+  "aiLaterAction": "Later",
+  "aiNotNowAction": "Not now",
+  "aiReviewSuggestionAction": "Review Suggestion…",
+  "aiWhyAction": "Why did you suggest this?",
+  "aiWhyInlineTitle": "Signals used",
+  "aiWhyDialogTitle": "Why this suggestion",
+  "doneAction": "Done",
+  "aiConfidenceLabel": "Confidence {value}%",
+  "@aiConfidenceLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiSectionTitle": "AI",
+  "aiSectionDescription": "Memory Coach keeps left-click locking untouched and only tries to learn when a lock suggestion would actually help. By default it starts with LockBar action history and away-and-return timing.",
+  "aiConnectionTitle": "Connection",
+  "aiConnectionConfiguredDescription": "Base URL: {baseUrl}\nAPI key: {maskedKey}",
+  "@aiConnectionConfiguredDescription": {
+    "placeholders": {
+      "baseUrl": {},
+      "maskedKey": {}
+    }
+  },
+  "aiConnectionMissingDescription": "No AI connection is saved yet. Open Configure, test the draft, then save it.",
+  "aiConnectionStatusLine": "Status: {status}",
+  "@aiConnectionStatusLine": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "aiConnectionVerifiedAtLine": "Verified: {value}",
+  "@aiConnectionVerifiedAtLine": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiConnectionModelLine": "Model: {value}",
+  "@aiConnectionModelLine": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiConnectionLastErrorLine": "Last error: {value}",
+  "@aiConnectionLastErrorLine": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiConnectionPendingDraftHint": "A local draft connection was found. Reopen Configure, test it, then save it.",
+  "aiConnectionNeedsTestHint": "Save alone is not enough. Run Test once for the current connection before turning suggestions on.",
+  "aiConfigureAction": "Configure…",
+  "aiClearConnectionAction": "Clear",
+  "aiTestConnectionAction": "Test",
+  "aiTestingConnectionAction": "Testing…",
+  "aiSuggestionsToggle": "AI suggestions",
+  "aiSuggestionsEnabledDescription": "LockBar will use only the enabled inputs to judge whether this moment is worth a lock suggestion.",
+  "aiSuggestionsDisabledDescription": "Turn this on only if you want LockBar to learn your lock timing. Nothing is collected before you do.",
+  "aiEnableAction": "Turn On Smart Suggestions",
+  "aiOnboardingTitle": "Turn on Smart Suggestions",
+  "aiOnboardingDescription": "LockBar can suggest cleaner lock moments after focus, wrap-ups, and short idle returns. It keeps left click unchanged.",
+  "aiOnboardingDefaultsTitle": "Default inputs",
+  "aiOnboardingPrivacyFootnote": "Everything else stays off until you enable it manually.",
+  "aiConfigDialogTitle": "Configure AI Connection",
+  "aiConfigDialogDescription": "LockBar saves both the base URL and API key in this app's local configuration on this Mac.",
+  "aiConfigBaseUrlLabel": "Base URL",
+  "aiConfigApiKeyLabel": "API key",
+  "aiConfigModelLine": "Model: {value}",
+  "@aiConfigModelLine": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiConfigDraftStatusTitle": "Draft test status",
+  "aiConfigDraftStatusLine": "Status: {value}",
+  "@aiConfigDraftStatusLine": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "aiConfigDraftNeedsTestHint": "Test the current draft before saving it.",
+  "aiSaveConnectionAction": "Save",
+  "aiBaseUrlRequired": "Enter a base URL.",
+  "aiApiKeyRequired": "Enter an API key.",
+  "aiSavedConnectionStateMissing": "No saved connection",
+  "aiSavedConnectionStateVerifiedHealthy": "Verified and healthy",
+  "aiSavedConnectionStateVerifiedDegraded": "Verified, but the most recent request failed",
+  "aiDraftTestStateIdle": "Not tested yet",
+  "aiDraftTestStateTesting": "Testing draft",
+  "aiDraftTestStateSuccess": "Draft verified",
+  "aiDraftTestStateFailure": "Draft test failed",
+  "aiNetworkStatusLabel": "AI network",
+  "aiCurrentMemoryLabel": "Current memory",
+  "aiDataSourcesTitle": "Inputs for suggestions",
+  "aiRecentSuggestionTitle": "Latest suggestion",
+  "aiDecisionHistoryTitle": "Decision History",
+  "aiDecisionHistoryDescription": "Each trigger is stored locally with collected context, model input, model output, and the final decision chain.",
+  "aiDecisionHistoryEmpty": "No AI decision traces have been recorded yet.",
+  "aiClearHistoryAction": "Clear history",
+  "aiInspectorStoredLocally": "Stored locally on this Mac",
+  "aiInspectorRawContextNotice": "Contains raw context text",
+  "aiInspectorNoCredentialsNotice": "Never includes API credentials",
+  "aiTraceCollectedSection": "Collected",
+  "aiTraceSentSection": "Sent to AI",
+  "aiTraceReturnedSection": "AI Returned",
+  "aiTraceOutcomeSection": "Outcome",
+  "aiTraceEnabledSourcesLabel": "Enabled sources",
+  "aiTraceContextSnapshotLabel": "Context snapshot",
+  "aiTraceMemorySnapshotLabel": "Memory profile",
+  "aiTraceRequestBodyLabel": "Request body",
+  "aiTraceRawResponseLabel": "Raw response",
+  "aiTraceParsedResponseLabel": "Parsed response",
+  "aiTraceErrorLabel": "Error",
+  "aiTraceRecommendationLabel": "Recommendation",
+  "aiTraceTriggerFocusEnded": "Focus ended",
+  "aiTraceTriggerWorkdayEnded": "Workday ended",
+  "aiTraceTriggerDelayedLockRequested": "Delayed lock requested",
+  "aiTraceTriggerCalendarBoundary": "Calendar boundary",
+  "aiTraceTriggerBluetoothChanged": "Bluetooth changed",
+  "aiTraceTriggerAwayReturned": "Away and return",
+  "aiTraceTriggerNetworkChanged": "Network changed",
+  "aiTraceTriggerAppContextChanged": "App context changed",
+  "aiTraceTriggerEveningWindDown": "Evening wind-down",
+  "aiTraceOutcomeSuggested": "Suggested",
+  "aiTraceOutcomeNoSuggestion": "No suggestion",
+  "aiTraceOutcomeFutureProtectionOnly": "Future protection only",
+  "aiTraceOutcomeRequestFailed": "Request failed",
+  "aiTraceOutcomeInvalidResponse": "Invalid response",
+  "aiTraceOutcomeBlockedByConfig": "Blocked by configuration",
+  "aiTraceDecisionLockNow": "Lock now",
+  "aiTraceDecisionLaterTwoMinutes": "Later (2 min)",
+  "aiTraceDecisionLaterFiveMinutes": "Later (5 min)",
+  "aiTraceDecisionNotNow": "Not now",
+  "aiTraceDecisionDismissed": "Dismissed",
+  "aiTraceDecisionIgnored": "Ignored",
+  "aiRecentSuggestionLabel": "Latest suggestion: {headline}",
+  "@aiRecentSuggestionLabel": {
+    "placeholders": {
+      "headline": {}
+    }
+  },
+  "aiTraySuggestionPrefix": "AI cue",
+  "aiStartFocusAction": "Start Focus",
+  "aiFocusPreset25": "Focus 25 min",
+  "aiFocusPreset50": "Focus 50 min",
+  "aiCancelFocusAction": "Cancel Focus",
+  "aiEndWorkdayAction": "End Workday",
+  "aiLockInAction": "Lock in…",
+  "aiLockIn30Seconds": "Lock in 30 sec",
+  "aiLockIn2Minutes": "Lock in 2 min",
+  "aiLockIn5Minutes": "Lock in 5 min",
+  "aiCancelDelayedLockAction": "Cancel Delayed Lock",
+  "aiHeadlineFocusEnded": "Focus block complete.",
+  "aiReasonFocusEndedFresh": "You just closed a focus block. If you are stepping away, this is the cleanest moment to lock.",
+  "aiReasonFocusEndedBuffer": "You usually leave yourself a small buffer after deep work. Lock now if you're done, or take the short runway again.",
+  "aiHeadlineWorkdayEnded": "Workday looks wrapped.",
+  "aiReasonWorkdayEndedFresh": "You marked the day as done. LockBar can help turn that into a clean stop.",
+  "aiReasonWorkdayEndedBuffer": "You often want a short runway after ending the day. Lock now if you're fully done, or take a few minutes first.",
+  "aiHeadlineCalendarBoundary": "Meeting boundary detected.",
+  "aiReasonCalendarBoundary": "\"{title}\" is right at the edge of your current context. If you're stepping away, this is a good lock point.",
+  "@aiReasonCalendarBoundary": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "aiFallbackCalendarTitle": "this event",
+  "aiHeadlineBluetoothBoundary": "Your setup just changed.",
+  "aiReasonBluetoothBoundary": "{device} disconnected or came back. LockBar treats that as a strong step-away signal.",
+  "@aiReasonBluetoothBoundary": {
+    "placeholders": {
+      "device": {}
+    }
+  },
+  "aiFallbackBluetoothDevice": "A familiar device",
+  "aiHeadlineFutureProtection": "That looked like an unguarded step-away.",
+  "aiReasonAwayReturned": "You came back after being idle for a while. LockBar will use this as a memory cue, not a late lock-now prompt.",
+  "aiHeadlineDelayRequested": "Short runway queued.",
+  "aiReasonDelayRequested": "You asked for a delayed lock. Memory Coach will remember whether short runways feel better than immediate locks.",
+  "aiNetworkStatusReady": "Configured locally",
+  "aiNetworkStatusTesting": "Testing connection",
+  "aiNetworkStatusOnline": "Cloud endpoint reachable",
+  "aiNetworkStatusOffline": "Cloud endpoint unavailable",
+  "aiNetworkStatusNotConfigured": "Connection not configured",
+  "aiDataSourceActionHistory": "LockBar action history",
+  "aiDataSourceActionHistoryDescription": "Learns when you usually choose to lock through LockBar.",
+  "aiDataSourceFrontmostApp": "Frontmost app",
+  "aiDataSourceFrontmostAppDescription": "Adds a coarse hint about what kind of work you are doing right now.",
+  "aiDataSourceWindowTitle": "Window title",
+  "aiDataSourceWindowTitleDescription": "Adds detailed app context. This is the most sensitive source.",
+  "aiDataSourceCalendar": "Calendar title and timing",
+  "aiDataSourceCalendarDescription": "Uses nearby event timing to catch clearer start and end boundaries.",
+  "aiDataSourceIdleState": "Away and return",
+  "aiDataSourceIdleStateDescription": "Detects when you stepped away from the Mac and came back.",
+  "aiDataSourceBluetooth": "Bluetooth device changes",
+  "aiDataSourceBluetoothDescription": "Uses familiar device disconnect or reconnect as a weak away signal.",
+  "aiDataSourceNetwork": "Wi-Fi / network changes",
+  "aiDataSourceNetworkDescription": "Uses network changes as an environment-change hint.",
+  "aiDataSourceStatusLine": "Current status: {status}",
+  "@aiDataSourceStatusLine": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "dataSourceStatusOff": "Off",
+  "dataSourceStatusOn": "On",
+  "dataSourceStatusNeedsPermission": "Needs permission",
+  "dataSourceStatusUnavailable": "Unavailable",
+  "privacySectionTitle": "Privacy",
+  "calendarAccessDialogTitle": "Allow calendar suggestions",
+  "calendarAccessDialogBody": "LockBar will read nearby event titles and times only after you turn on the calendar source.",
+  "windowTitleAccessDialogTitle": "Accessibility is required",
+  "windowTitleAccessDialogBody": "Window titles use the same macOS Accessibility permission as one-click locking. Turn that on first if you want this source.",
+  "continueAction": "Continue",
+  "cancelAction": "Cancel",
+  "aiSignalTimeOfDay": "Time of day",
+  "aiSignalActionHistory": "Recent LockBar actions",
+  "aiSignalFrontmostApp": "Frontmost app",
+  "aiSignalWindowTitle": "Window title",
+  "aiSignalCalendar": "Calendar event timing",
+  "aiSignalIdleState": "Away / return state",
+  "aiSignalBluetooth": "Bluetooth device changes",
+  "aiSignalNetwork": "Network environment",
+  "aiRitualsTitle": "Manual rituals",
+  "aiFocusRunningLabel": "Focus session running: {minutes} min",
+  "@aiFocusRunningLabel": {
+    "placeholders": {
+      "minutes": {}
+    }
+  },
+  "aiFocusIdleLabel": "No focus session is running.",
+  "aiDelayedLockRunningLabel": "Delayed lock queued: {duration}",
+  "@aiDelayedLockRunningLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "aiDelayedLockIdleLabel": "No delayed lock is queued.",
+  "aiMemoryTitle": "Memory",
+  "aiResetMemoryAction": "Reset memory",
+  "aiMemorySummaryEmpty": "Fresh memory. LockBar is still learning your timing.",
+  "aiMemoryHabitFocusBuffer": "You usually leave yourself a short buffer after focus sessions.",
+  "aiMemoryHabitWorkdayRunway": "You prefer a small runway before the final lock at the end of the day.",
+  "aiMemoryHabitEarlierPrompts": "You respond better to earlier cues than after-the-fact reminders."
 }

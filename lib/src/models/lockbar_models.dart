@@ -54,6 +54,23 @@ enum StatusMessageKey {
   lockFailureEventSequence,
   lockFailureGeneric,
   localePreferenceFailed,
+  aiModeEnabled,
+  aiModeDisabled,
+  aiSettingsSaveFailed,
+  aiConfigurationSaved,
+  aiConfigurationMissing,
+  aiConnectionVerificationRequired,
+  aiConnectionTestSucceeded,
+  aiConnectionTestFailed,
+  aiRequestFailed,
+  aiInvalidResponse,
+  aiMemoryReset,
+  aiMemoryResetFailed,
+  focusSessionStarted,
+  focusSessionCancelled,
+  delayedLockScheduled,
+  delayedLockCancelled,
+  workdayReviewStarted,
 }
 
 class StatusMessage {

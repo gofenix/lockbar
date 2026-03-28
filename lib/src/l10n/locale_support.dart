@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import '../models/ai_models.dart';
 import '../models/lockbar_models.dart';
 import 'app_localizations.dart';
 
@@ -34,6 +35,14 @@ Locale localeForPreference(
 
 AppLocalizations localizationsForLocale(Locale locale) {
   return lookupAppLocalizations(resolveSupportedLocale(locale));
+}
+
+Locale parseLocaleTag(String localeTag) {
+  final normalized = localeTag.toLowerCase();
+  if (normalized.startsWith('zh')) {
+    return simplifiedChineseAppLocale;
+  }
+  return englishAppLocale;
 }
 
 String preferenceLabel(
@@ -102,5 +111,219 @@ String? statusMessageText(
       localizations.statusLockFailureGeneric,
     StatusMessageKey.localePreferenceFailed =>
       localizations.statusLocalePreferenceFailed,
+    StatusMessageKey.aiModeEnabled => localizations.statusAiModeEnabled,
+    StatusMessageKey.aiModeDisabled => localizations.statusAiModeDisabled,
+    StatusMessageKey.aiSettingsSaveFailed =>
+      localizations.statusAiSettingsSaveFailed,
+    StatusMessageKey.aiConfigurationSaved =>
+      localizations.statusAiConfigurationSaved,
+    StatusMessageKey.aiConfigurationMissing =>
+      localizations.statusAiConfigurationMissing,
+    StatusMessageKey.aiConnectionVerificationRequired =>
+      localizations.statusAiConnectionVerificationRequired,
+    StatusMessageKey.aiConnectionTestSucceeded =>
+      localizations.statusAiConnectionTestSucceeded,
+    StatusMessageKey.aiConnectionTestFailed =>
+      localizations.statusAiConnectionTestFailed,
+    StatusMessageKey.aiRequestFailed => localizations.statusAiRequestFailed,
+    StatusMessageKey.aiInvalidResponse => localizations.statusAiInvalidResponse,
+    StatusMessageKey.aiMemoryReset => localizations.statusAiMemoryReset,
+    StatusMessageKey.aiMemoryResetFailed =>
+      localizations.statusAiMemoryResetFailed,
+    StatusMessageKey.focusSessionStarted =>
+      localizations.statusFocusSessionStarted,
+    StatusMessageKey.focusSessionCancelled =>
+      localizations.statusFocusSessionCancelled,
+    StatusMessageKey.delayedLockScheduled =>
+      localizations.statusDelayedLockScheduled,
+    StatusMessageKey.delayedLockCancelled =>
+      localizations.statusDelayedLockCancelled,
+    StatusMessageKey.workdayReviewStarted =>
+      localizations.statusWorkdayReviewStarted,
   };
+}
+
+String aiConnectionStatusLabel(
+  AppLocalizations localizations,
+  AiConnectionStatus status,
+) {
+  return switch (status) {
+    AiConnectionStatus.ready => localizations.aiNetworkStatusReady,
+    AiConnectionStatus.testing => localizations.aiNetworkStatusTesting,
+    AiConnectionStatus.online => localizations.aiNetworkStatusOnline,
+    AiConnectionStatus.offline => localizations.aiNetworkStatusOffline,
+    AiConnectionStatus.notConfigured =>
+      localizations.aiNetworkStatusNotConfigured,
+  };
+}
+
+String aiSavedConnectionStateLabel(
+  AppLocalizations localizations,
+  AiSavedConnectionState state,
+) {
+  return switch (state) {
+    AiSavedConnectionState.missing =>
+      localizations.aiSavedConnectionStateMissing,
+    AiSavedConnectionState.verifiedHealthy =>
+      localizations.aiSavedConnectionStateVerifiedHealthy,
+    AiSavedConnectionState.verifiedDegraded =>
+      localizations.aiSavedConnectionStateVerifiedDegraded,
+  };
+}
+
+String aiDraftTestStateLabel(
+  AppLocalizations localizations,
+  AiConnectionDraftTestState state,
+) {
+  return switch (state) {
+    AiConnectionDraftTestState.idle => localizations.aiDraftTestStateIdle,
+    AiConnectionDraftTestState.testing => localizations.aiDraftTestStateTesting,
+    AiConnectionDraftTestState.success => localizations.aiDraftTestStateSuccess,
+    AiConnectionDraftTestState.failure => localizations.aiDraftTestStateFailure,
+  };
+}
+
+String aiDataSourceLabel(AppLocalizations localizations, AiDataSource source) {
+  return switch (source) {
+    AiDataSource.actionHistory => localizations.aiDataSourceActionHistory,
+    AiDataSource.frontmostApp => localizations.aiDataSourceFrontmostApp,
+    AiDataSource.windowTitle => localizations.aiDataSourceWindowTitle,
+    AiDataSource.calendar => localizations.aiDataSourceCalendar,
+    AiDataSource.idleState => localizations.aiDataSourceIdleState,
+    AiDataSource.bluetooth => localizations.aiDataSourceBluetooth,
+    AiDataSource.network => localizations.aiDataSourceNetwork,
+  };
+}
+
+String aiDataSourceDescription(
+  AppLocalizations localizations,
+  AiDataSource source,
+) {
+  return switch (source) {
+    AiDataSource.actionHistory =>
+      localizations.aiDataSourceActionHistoryDescription,
+    AiDataSource.frontmostApp =>
+      localizations.aiDataSourceFrontmostAppDescription,
+    AiDataSource.windowTitle =>
+      localizations.aiDataSourceWindowTitleDescription,
+    AiDataSource.calendar => localizations.aiDataSourceCalendarDescription,
+    AiDataSource.idleState => localizations.aiDataSourceIdleStateDescription,
+    AiDataSource.bluetooth => localizations.aiDataSourceBluetoothDescription,
+    AiDataSource.network => localizations.aiDataSourceNetworkDescription,
+  };
+}
+
+String aiDataSourceAvailabilityLabel(
+  AppLocalizations localizations,
+  AiDataSourceAvailability availability,
+) {
+  return switch (availability) {
+    AiDataSourceAvailability.off => localizations.dataSourceStatusOff,
+    AiDataSourceAvailability.on => localizations.dataSourceStatusOn,
+    AiDataSourceAvailability.needsPermission =>
+      localizations.dataSourceStatusNeedsPermission,
+    AiDataSourceAvailability.unavailable =>
+      localizations.dataSourceStatusUnavailable,
+  };
+}
+
+String aiSignalLabel(AppLocalizations localizations, AiSignalType signal) {
+  return switch (signal) {
+    AiSignalType.timeOfDay => localizations.aiSignalTimeOfDay,
+    AiSignalType.actionHistory => localizations.aiSignalActionHistory,
+    AiSignalType.frontmostApp => localizations.aiSignalFrontmostApp,
+    AiSignalType.windowTitle => localizations.aiSignalWindowTitle,
+    AiSignalType.calendar => localizations.aiSignalCalendar,
+    AiSignalType.idleState => localizations.aiSignalIdleState,
+    AiSignalType.bluetooth => localizations.aiSignalBluetooth,
+    AiSignalType.network => localizations.aiSignalNetwork,
+  };
+}
+
+String aiTriggerLabel(AppLocalizations localizations, AiTriggerType trigger) {
+  return switch (trigger) {
+    AiTriggerType.focusEnded => localizations.aiTraceTriggerFocusEnded,
+    AiTriggerType.workdayEnded => localizations.aiTraceTriggerWorkdayEnded,
+    AiTriggerType.delayedLockRequested =>
+      localizations.aiTraceTriggerDelayedLockRequested,
+    AiTriggerType.calendarBoundary =>
+      localizations.aiTraceTriggerCalendarBoundary,
+    AiTriggerType.bluetoothChanged =>
+      localizations.aiTraceTriggerBluetoothChanged,
+    AiTriggerType.awayReturned => localizations.aiTraceTriggerAwayReturned,
+    AiTriggerType.networkChanged => localizations.aiTraceTriggerNetworkChanged,
+    AiTriggerType.appContextChanged =>
+      localizations.aiTraceTriggerAppContextChanged,
+    AiTriggerType.eveningWindDown =>
+      localizations.aiTraceTriggerEveningWindDown,
+  };
+}
+
+String aiDecisionTraceOutcomeLabel(
+  AppLocalizations localizations,
+  AiDecisionTraceOutcome outcome,
+) {
+  return switch (outcome) {
+    AiDecisionTraceOutcome.suggested => localizations.aiTraceOutcomeSuggested,
+    AiDecisionTraceOutcome.noSuggestion =>
+      localizations.aiTraceOutcomeNoSuggestion,
+    AiDecisionTraceOutcome.futureProtectionOnly =>
+      localizations.aiTraceOutcomeFutureProtectionOnly,
+    AiDecisionTraceOutcome.requestFailed =>
+      localizations.aiTraceOutcomeRequestFailed,
+    AiDecisionTraceOutcome.invalidResponse =>
+      localizations.aiTraceOutcomeInvalidResponse,
+    AiDecisionTraceOutcome.blockedByConfig =>
+      localizations.aiTraceOutcomeBlockedByConfig,
+  };
+}
+
+String aiDecisionLabel(
+  AppLocalizations localizations,
+  AiDecisionType decision,
+) {
+  return switch (decision) {
+    AiDecisionType.lockNow => localizations.aiTraceDecisionLockNow,
+    AiDecisionType.laterTwoMinutes =>
+      localizations.aiTraceDecisionLaterTwoMinutes,
+    AiDecisionType.laterFiveMinutes =>
+      localizations.aiTraceDecisionLaterFiveMinutes,
+    AiDecisionType.notNow => localizations.aiTraceDecisionNotNow,
+    AiDecisionType.dismissed => localizations.aiTraceDecisionDismissed,
+    AiDecisionType.ignored => localizations.aiTraceDecisionIgnored,
+  };
+}
+
+String memoryProfileSummary(
+  AppLocalizations localizations,
+  MemoryProfile profile,
+) {
+  if (profile.habits.isEmpty) {
+    return localizations.aiMemorySummaryEmpty;
+  }
+
+  final summaries = localizedMemoryHabits(localizations, profile);
+  return summaries.take(2).join(' ');
+}
+
+List<String> localizedMemoryHabits(
+  AppLocalizations localizations,
+  MemoryProfile profile,
+) {
+  final localized = <String>[];
+  for (final habit in profile.habits) {
+    switch (habit) {
+      case 'prefers_buffer_after_focus':
+        localized.add(localizations.aiMemoryHabitFocusBuffer);
+      case 'prefers_runway_after_workday':
+        localized.add(localizations.aiMemoryHabitWorkdayRunway);
+      case 'responds_better_to_earlier_prompts':
+        localized.add(localizations.aiMemoryHabitEarlierPrompts);
+      default:
+        if (profile.summary.isNotEmpty) {
+          localized.add(profile.summary);
+        }
+    }
+  }
+  return localized.toSet().toList(growable: false);
 }

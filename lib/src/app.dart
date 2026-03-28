@@ -49,11 +49,12 @@ class _LockbarAppState extends State<LockbarApp> with WidgetsBindingObserver {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final platformBrightness =
+            WidgetsBinding.instance.platformDispatcher.platformBrightness;
         final baseScheme = ColorScheme.fromSeed(
-          brightness: Brightness.dark,
-          seedColor: const Color(0xFF8FE86B),
-          primary: const Color(0xFF8FE86B),
-          surface: const Color(0xFF151A1F),
+          brightness: platformBrightness,
+          seedColor: const Color(0xFF3B82F6),
+          primary: const Color(0xFF3B82F6),
         );
 
         return MaterialApp(
@@ -69,17 +70,13 @@ class _LockbarAppState extends State<LockbarApp> with WidgetsBindingObserver {
           },
           theme: ThemeData(
             useMaterial3: true,
-            brightness: Brightness.dark,
+            brightness: platformBrightness,
             colorScheme: baseScheme.copyWith(
-              secondary: const Color(0xFF7BD7F0),
-              tertiary: const Color(0xFFFFC870),
-              surfaceContainerHighest: const Color(0xFF222A31),
+              surfaceContainerHighest: platformBrightness == Brightness.dark
+                  ? const Color(0xFF2A2C31)
+                  : const Color(0xFFE7E9EE),
             ),
-            scaffoldBackgroundColor: const Color(0xFF0B1014),
-            textTheme: ThemeData.dark().textTheme.apply(
-              bodyColor: const Color(0xFFF2F6F8),
-              displayColor: const Color(0xFFF2F6F8),
-            ),
+            scaffoldBackgroundColor: baseScheme.surface,
           ),
           home: LockbarWindow(controller: widget.controller),
         );
