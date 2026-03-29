@@ -369,6 +369,7 @@ enum AiDecisionTraceOutcome {
   suggested,
   noSuggestion,
   futureProtectionOnly,
+  timedOut,
   requestFailed,
   invalidResponse,
   blockedByConfig;
@@ -377,6 +378,7 @@ enum AiDecisionTraceOutcome {
     AiDecisionTraceOutcome.suggested => 'suggested',
     AiDecisionTraceOutcome.noSuggestion => 'noSuggestion',
     AiDecisionTraceOutcome.futureProtectionOnly => 'futureProtectionOnly',
+    AiDecisionTraceOutcome.timedOut => 'timedOut',
     AiDecisionTraceOutcome.requestFailed => 'requestFailed',
     AiDecisionTraceOutcome.invalidResponse => 'invalidResponse',
     AiDecisionTraceOutcome.blockedByConfig => 'blockedByConfig',
@@ -1007,6 +1009,7 @@ class AiDecisionTrace {
       switch (outcome) {
         AiDecisionTraceOutcome.noSuggestion => 'No suggestion',
         AiDecisionTraceOutcome.futureProtectionOnly => 'Future protection cue',
+        AiDecisionTraceOutcome.timedOut => 'Request timed out',
         AiDecisionTraceOutcome.requestFailed => 'Request failed',
         AiDecisionTraceOutcome.invalidResponse => 'Invalid AI response',
         AiDecisionTraceOutcome.blockedByConfig => 'Blocked by configuration',

@@ -501,6 +501,12 @@ abstract class AppLocalizations {
   /// **'LockBar could not verify the AI connection. Review the base URL, API key, and endpoint response, then test again.'**
   String get statusAiConnectionTestFailed;
 
+  /// No description provided for @statusAiRequestTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI request timed out. Try again in a moment, or check the network and endpoint latency.'**
+  String get statusAiRequestTimedOut;
+
   /// No description provided for @statusAiRequestFailed.
   ///
   /// In en, this message translates to:
@@ -1082,6 +1088,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Future protection only'**
   String get aiTraceOutcomeFutureProtectionOnly;
+
+  /// No description provided for @aiTraceOutcomeTimedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Request timed out'**
+  String get aiTraceOutcomeTimedOut;
 
   /// No description provided for @aiTraceOutcomeRequestFailed.
   ///

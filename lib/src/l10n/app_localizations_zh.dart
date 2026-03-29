@@ -228,6 +228,9 @@ class AppLocalizationsZh extends AppLocalizations {
       'LockBar 无法验证 AI 连接。请检查 base URL、API key 和接口响应后再试。';
 
   @override
+  String get statusAiRequestTimedOut => 'AI 请求超时了。请稍后重试，或检查网络和接口响应速度。';
+
+  @override
   String get statusAiRequestFailed =>
       'LockBar 无法连接 AI 服务。请检查 API key、网络，或 MiniMax 的 Anthropic 兼容接口地址。';
 
@@ -541,6 +544,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiTraceOutcomeFutureProtectionOnly => '仅未来防护建议';
+
+  @override
+  String get aiTraceOutcomeTimedOut => '请求超时';
 
   @override
   String get aiTraceOutcomeRequestFailed => '请求失败';
@@ -1048,6 +1054,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'LockBar 无法验证 AI 连接。请检查 base URL、API key 和接口响应后再试。';
 
   @override
+  String get statusAiRequestTimedOut => 'AI 请求超时了。请稍后重试，或检查网络和接口响应速度。';
+
+  @override
   String get statusAiRequestFailed =>
       'LockBar 无法连接 AI 服务。请检查 API key、网络，或 MiniMax 的 Anthropic 兼容接口地址。';
 
@@ -1361,6 +1370,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get aiTraceOutcomeFutureProtectionOnly => '仅未来防护建议';
+
+  @override
+  String get aiTraceOutcomeTimedOut => '请求超时';
 
   @override
   String get aiTraceOutcomeRequestFailed => '请求失败';

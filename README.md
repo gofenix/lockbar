@@ -78,7 +78,7 @@ xcrun notarytool store-credentials lockbar-notary \
 如需指定版本号:
 
 ```bash
-./scripts/release-macos.sh --build-name 1.0.2 --build-number 3
+./scripts/release-macos.sh --build-name 1.0.3 --build-number 4
 ```
 
 ## English
@@ -155,5 +155,5 @@ xcrun notarytool store-credentials lockbar-notary \
 Override the release version when needed:
 
 ```bash
-./scripts/release-macos.sh --build-name 1.0.2 --build-number 3
+./scripts/release-macos.sh --build-name 1.0.3 --build-number 4
 ```

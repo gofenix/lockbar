@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import '../models/ai_models.dart';
 
-enum AiServiceErrorCode { notConfigured, requestFailed, invalidResponse }
+enum AiServiceErrorCode {
+  notConfigured,
+  timedOut,
+  requestFailed,
+  invalidResponse,
+}
 
 class AiServiceException implements Exception {
   const AiServiceException(this.code, this.message, {this.debug});
@@ -14,6 +20,7 @@ class AiServiceException implements Exception {
 
   AiConnectionStatus get connectionStatus => switch (code) {
     AiServiceErrorCode.notConfigured => AiConnectionStatus.notConfigured,
+    AiServiceErrorCode.timedOut ||
     AiServiceErrorCode.requestFailed ||
     AiServiceErrorCode.invalidResponse => AiConnectionStatus.offline,
   };
@@ -44,16 +51,30 @@ abstract class AiInferenceClient {
 }
 
 class AdaptiveAiInferenceClient implements AiInferenceClient {
-  AdaptiveAiInferenceClient({HttpClient? httpClient, String? model})
+  AdaptiveAiInferenceClient({
+    HttpClient? httpClient,
+    String? model,
+    Duration? testConnectionTimeout,
+    Duration? recommendationTimeout,
+    Duration? feedbackTimeout,
+  })
     : _httpClient = httpClient ?? HttpClient(),
       _model = (model ?? _defaultModel).trim().isEmpty
           ? _defaultModel
-          : (model ?? _defaultModel).trim();
+          : (model ?? _defaultModel).trim(),
+      _testConnectionTimeout =
+          testConnectionTimeout ?? const Duration(seconds: 12),
+      _recommendationTimeout =
+          recommendationTimeout ?? const Duration(seconds: 20),
+      _feedbackTimeout = feedbackTimeout ?? const Duration(seconds: 12);
 
   static const _defaultModel = 'MiniMax-M2.7';
 
   final HttpClient _httpClient;
   final String _model;
+  final Duration _testConnectionTimeout;
+  final Duration _recommendationTimeout;
+  final Duration _feedbackTimeout;
 
   @override
   String get model => _model;
@@ -66,6 +87,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
           'Return a tiny plain-text acknowledgement so the client can verify connectivity.',
       userPrompt: 'Reply with exactly: OK',
       maxTokens: 128,
+      timeout: _testConnectionTimeout,
     );
     final text = _extractTextContent(
       exchange.responseJson,
@@ -97,6 +119,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
         memoryProfile: memoryProfile,
       ),
       maxTokens: 700,
+      timeout: _recommendationTimeout,
     );
     final decoded = _decodeJsonObject(
       _extractTextContent(exchange.responseJson, debug: exchange.debug),
@@ -144,6 +167,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
         memoryProfile: memoryProfile,
       ),
       maxTokens: 400,
+      timeout: _feedbackTimeout,
     );
     final decoded = _decodeJsonObject(
       _extractTextContent(exchange.responseJson, debug: exchange.debug),
@@ -155,8 +179,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
         .toSet()
         .toList(growable: false);
     if (summary == null) {
-      throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
+      _invalidResponse(
         'AI feedback omitted the required summary field.',
         debug: exchange.debug.copyWith(parsedResponse: decoded),
       );
@@ -179,6 +202,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
     required String systemPrompt,
     required String userPrompt,
     required int maxTokens,
+    required Duration timeout,
   }) async {
     final runtimeConfig = _AiRuntimeConfig.fromEndpointConfig(
       config,
@@ -191,48 +215,87 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
       userPrompt: userPrompt,
       maxTokens: maxTokens,
     );
-    final request = await _httpClient.postUrl(uri);
-    request.headers.contentType = ContentType.json;
-    request.headers.set('x-api-key', runtimeConfig.apiKey);
-    request.headers.set('anthropic-version', '2023-06-01');
-    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-    request.add(utf8.encode(jsonEncode(requestBody)));
-
-    final response = await request.close().timeout(const Duration(seconds: 6));
-    final body = await response.transform(utf8.decoder).join();
     final debug = AiInferenceExchangeDebug(
       model: runtimeConfig.model,
       baseUrl: runtimeConfig.baseUrl,
       requestBody: requestBody,
-      rawResponseText: body,
     );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    try {
+      final request = await _httpClient.postUrl(uri).timeout(timeout);
+      request.headers.contentType = ContentType.json;
+      request.headers.set('x-api-key', runtimeConfig.apiKey);
+      request.headers.set('anthropic-version', '2023-06-01');
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.add(utf8.encode(jsonEncode(requestBody)));
+
+      final response = await request.close().timeout(timeout);
+      final body = await response.transform(utf8.decoder).join().timeout(timeout);
+      final responseDebug = debug.copyWith(rawResponseText: body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final message = _extractErrorMessage(body, response.statusCode);
+        throw AiServiceException(
+          AiServiceErrorCode.requestFailed,
+          message,
+          debug: responseDebug.copyWith(errorMessage: message),
+        );
+      }
+
+      if (body.isEmpty) {
+        _invalidResponse('AI response body was empty.', debug: responseDebug);
+      }
+
+      final decoded = _tryDecodeJson(body);
+      if (decoded is! Map<String, dynamic>) {
+        _invalidResponse(
+          'AI response was not a JSON object.',
+          debug: responseDebug,
+        );
+      }
+      return _AiMessageExchange(
+        responseJson: decoded,
+        debug: responseDebug.copyWith(parsedResponse: decoded),
+      );
+    } on AiServiceException {
+      rethrow;
+    } on TimeoutException {
+      final message =
+          'AI request timed out after ${timeout.inSeconds} seconds.';
+      throw AiServiceException(
+        AiServiceErrorCode.timedOut,
+        message,
+        debug: debug.copyWith(errorMessage: message),
+      );
+    } on SocketException catch (error) {
+      final message =
+          'Network error while contacting the AI service: ${error.message}';
       throw AiServiceException(
         AiServiceErrorCode.requestFailed,
-        _extractErrorMessage(body, response.statusCode),
-        debug: debug,
+        message,
+        debug: debug.copyWith(errorMessage: message),
       );
-    }
-
-    if (body.isEmpty) {
+    } on HandshakeException catch (error) {
+      final message =
+          'TLS handshake failed while contacting the AI service: $error';
       throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
-        'AI response body was empty.',
-        debug: debug,
+        AiServiceErrorCode.requestFailed,
+        message,
+        debug: debug.copyWith(errorMessage: message),
       );
-    }
-
-    final decoded = _tryDecodeJson(body);
-    if (decoded is! Map<String, dynamic>) {
+    } on HttpException catch (error) {
+      final message = 'HTTP error while contacting the AI service: ${error.message}';
       throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
-        'AI response was not a JSON object.',
-        debug: debug,
+        AiServiceErrorCode.requestFailed,
+        message,
+        debug: debug.copyWith(errorMessage: message),
       );
     }
-    return _AiMessageExchange(
-      responseJson: decoded,
-      debug: debug.copyWith(parsedResponse: decoded),
+  }
+
+  Never _invalidResponse(String message, {AiInferenceExchangeDebug? debug}) {
+    throw AiServiceException(
+      AiServiceErrorCode.invalidResponse,
+      message,
+      debug: debug?.copyWith(errorMessage: message),
     );
   }
 
@@ -335,8 +398,7 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
     }
     final text = buffer.toString().trim();
     if (text.isEmpty) {
-      throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
+      _invalidResponse(
         'AI response did not contain any text content.',
         debug: debug,
       );
@@ -359,20 +421,12 @@ class AdaptiveAiInferenceClient implements AiInferenceClient {
     final start = candidate.indexOf('{');
     final end = candidate.lastIndexOf('}');
     if (start == -1 || end == -1 || end < start) {
-      throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
-        'AI response was not valid JSON.',
-        debug: debug,
-      );
+      _invalidResponse('AI response was not valid JSON.', debug: debug);
     }
 
     final decoded = _tryDecodeJson(candidate.substring(start, end + 1));
     if (decoded is! Map<String, dynamic>) {
-      throw AiServiceException(
-        AiServiceErrorCode.invalidResponse,
-        'AI response JSON was not an object.',
-        debug: debug,
-      );
+      _invalidResponse('AI response JSON was not an object.', debug: debug);
     }
     return decoded;
   }

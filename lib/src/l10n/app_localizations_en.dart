@@ -251,6 +251,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'LockBar could not verify the AI connection. Review the base URL, API key, and endpoint response, then test again.';
 
   @override
+  String get statusAiRequestTimedOut =>
+      'The AI request timed out. Try again in a moment, or check the network and endpoint latency.';
+
+  @override
   String get statusAiRequestFailed =>
       'LockBar could not reach the AI service. Check the API key, network, or Anthropic-compatible MiniMax endpoint.';
 
@@ -573,6 +577,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiTraceOutcomeFutureProtectionOnly => 'Future protection only';
+
+  @override
+  String get aiTraceOutcomeTimedOut => 'Request timed out';
 
   @override
   String get aiTraceOutcomeRequestFailed => 'Request failed';

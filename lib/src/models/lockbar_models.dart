@@ -62,6 +62,7 @@ enum StatusMessageKey {
   aiConnectionVerificationRequired,
   aiConnectionTestSucceeded,
   aiConnectionTestFailed,
+  aiRequestTimedOut,
   aiRequestFailed,
   aiInvalidResponse,
   aiMemoryReset,

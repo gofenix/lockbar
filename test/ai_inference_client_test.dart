@@ -232,6 +232,87 @@ void main() {
   });
 
   test(
+    'recommend maps slow responses to timedOut and preserves request debug data',
+    () async {
+      server.listen((request) async {
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'msg_slow',
+            'content': [
+              {
+                'type': 'text',
+                'text':
+                    '{"shouldSuggest":false,"decisionReason":"Too slow to matter.","recommendation":null}',
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final client = AdaptiveAiInferenceClient(
+        recommendationTimeout: const Duration(milliseconds: 20),
+      );
+
+      await expectLater(
+        () => client.recommend(
+          installId: 'install-slow',
+          config: AiEndpointConfig(
+            baseUrl: 'http://127.0.0.1:${server.port}/anthropic',
+            apiKey: 'test-key',
+          ),
+          snapshot: ContextSnapshot(
+            trigger: AiTriggerType.awayReturned,
+            occurredAt: DateTime(2026, 1, 1, 21),
+            localeTag: 'en',
+            hourOfDay: 21,
+            weekday: DateTime.thursday,
+            recentActions: const ['lock.now.primary'],
+            systemContext: SystemContextSnapshot(
+              collectedAt: DateTime(2026, 1, 1, 21),
+              idleSeconds: 90,
+              bluetoothDevices: const [],
+              networkReachable: true,
+            ),
+          ),
+          memoryProfile: MemoryProfile.empty(),
+          allowLocalFallback: false,
+        ),
+        throwsA(
+          isA<AiServiceException>()
+              .having(
+                (error) => error.code,
+                'code',
+                AiServiceErrorCode.timedOut,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('timed out'),
+              )
+              .having(
+                (error) => error.debug?.requestBody['model'],
+                'request model',
+                'MiniMax-M2.7',
+              )
+              .having(
+                (error) => error.debug?.rawResponseText,
+                'rawResponseText',
+                isNull,
+              )
+              .having(
+                (error) => error.debug?.errorMessage,
+                'errorMessage',
+                contains('timed out'),
+              ),
+        ),
+      );
+    },
+  );
+
+  test(
     'testConnection attaches sanitized debug payload on invalid response',
     () async {
       server.listen((request) async {

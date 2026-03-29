@@ -882,6 +882,53 @@ void main() {
   );
 
   test(
+    'runtime AI timeout degrades the saved connection and records a timedOut trace',
+    () async {
+      final aiClient = FakeAiInferenceClient()
+        ..recommendError = const AiServiceException(
+          AiServiceErrorCode.timedOut,
+          'AI request timed out after 20 seconds.',
+        );
+      final aiMemory = FakeAiMemoryService()
+        ..settings = AiSettings.recommendedEnabled()
+        ..savedConnection = AiSavedConnection(
+          baseUrl: 'https://api.minimaxi.com/anthropic',
+          apiKey: 'test-key',
+          model: 'MiniMax-M2.7',
+          verifiedAt: DateTime(2026, 3, 28, 9, 30),
+          lastHealthyAt: DateTime(2026, 3, 28, 9, 30),
+        );
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: aiMemory,
+        aiInferenceClient: aiClient,
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+
+      await controller.initialize();
+      await controller.triggerWorkdayWrapUp();
+
+      expect(controller.aiConnectionStatus, AiConnectionStatus.offline);
+      expect(
+        controller.aiSavedConnectionState,
+        AiSavedConnectionState.verifiedDegraded,
+      );
+      expect(controller.canEnableAi, isTrue);
+      expect(
+        controller.aiConnectionDetail,
+        'AI request timed out after 20 seconds.',
+      );
+      expect(
+        controller.decisionTraces.single.outcome,
+        AiDecisionTraceOutcome.timedOut,
+      );
+    },
+  );
+
+  test(
     'saving a new verified connection keeps AI enabled until the new config is saved',
     () async {
       final aiMemory = FakeAiMemoryService()

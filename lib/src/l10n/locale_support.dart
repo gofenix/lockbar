@@ -125,6 +125,7 @@ String? statusMessageText(
       localizations.statusAiConnectionTestSucceeded,
     StatusMessageKey.aiConnectionTestFailed =>
       localizations.statusAiConnectionTestFailed,
+    StatusMessageKey.aiRequestTimedOut => localizations.statusAiRequestTimedOut,
     StatusMessageKey.aiRequestFailed => localizations.statusAiRequestFailed,
     StatusMessageKey.aiInvalidResponse => localizations.statusAiInvalidResponse,
     StatusMessageKey.aiMemoryReset => localizations.statusAiMemoryReset,
@@ -269,6 +270,7 @@ String aiDecisionTraceOutcomeLabel(
       localizations.aiTraceOutcomeNoSuggestion,
     AiDecisionTraceOutcome.futureProtectionOnly =>
       localizations.aiTraceOutcomeFutureProtectionOnly,
+    AiDecisionTraceOutcome.timedOut => localizations.aiTraceOutcomeTimedOut,
     AiDecisionTraceOutcome.requestFailed =>
       localizations.aiTraceOutcomeRequestFailed,
     AiDecisionTraceOutcome.invalidResponse =>

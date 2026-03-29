@@ -1058,6 +1058,7 @@ class LockbarController extends ChangeNotifier {
         outcome: switch (error.code) {
           AiServiceErrorCode.notConfigured =>
             AiDecisionTraceOutcome.blockedByConfig,
+          AiServiceErrorCode.timedOut => AiDecisionTraceOutcome.timedOut,
           AiServiceErrorCode.requestFailed =>
             AiDecisionTraceOutcome.requestFailed,
           AiServiceErrorCode.invalidResponse =>
@@ -1069,6 +1070,7 @@ class LockbarController extends ChangeNotifier {
       _setErrorKey(switch (error.code) {
         AiServiceErrorCode.notConfigured =>
           StatusMessageKey.aiConfigurationMissing,
+        AiServiceErrorCode.timedOut => StatusMessageKey.aiRequestTimedOut,
         AiServiceErrorCode.requestFailed => StatusMessageKey.aiRequestFailed,
         AiServiceErrorCode.invalidResponse =>
           StatusMessageKey.aiInvalidResponse,
@@ -1130,6 +1132,7 @@ class LockbarController extends ChangeNotifier {
       _setErrorKey(switch (error.code) {
         AiServiceErrorCode.notConfigured =>
           StatusMessageKey.aiConfigurationMissing,
+        AiServiceErrorCode.timedOut => StatusMessageKey.aiRequestTimedOut,
         AiServiceErrorCode.requestFailed => StatusMessageKey.aiRequestFailed,
         AiServiceErrorCode.invalidResponse =>
           StatusMessageKey.aiInvalidResponse,
@@ -1194,6 +1197,7 @@ class LockbarController extends ChangeNotifier {
         'AI returned shouldSuggest = false.',
       AiDecisionTraceOutcome.futureProtectionOnly =>
         'AI returned a future-protection-only suggestion.',
+      AiDecisionTraceOutcome.timedOut => 'The AI request timed out.',
       AiDecisionTraceOutcome.requestFailed => 'The AI request failed.',
       AiDecisionTraceOutcome.invalidResponse =>
         'The AI response could not be parsed.',
