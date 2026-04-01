@@ -60,9 +60,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _configureTray() async {
-    await trayManager.setIcon(
-      _trayIconAsset(controller.hasSuggestionIndicator),
-    );
+    await _applyTrayIcon(controller.hasSuggestionIndicator);
     await trayManager.setToolTip('LockBar');
   }
 
@@ -72,13 +70,21 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
         : 'assets/tray/tray_icon_template.png';
   }
 
+  Future<void> _applyTrayIcon(bool attention) async {
+    await trayManager.setIcon(
+      _trayIconAsset(attention),
+      iconSize: 19,
+      isTemplate: !attention,
+    );
+  }
+
   Future<void> _syncTrayIconAppearance({bool force = false}) async {
     final attention = controller.hasSuggestionIndicator;
     if (!force && _lastSuggestionIndicatorVisible == attention) {
       return;
     }
     _lastSuggestionIndicatorVisible = attention;
-    await trayManager.setIcon(_trayIconAsset(attention), iconSize: 18);
+    await _applyTrayIcon(attention);
   }
 
   Future<void> _syncContextMenu() async {
