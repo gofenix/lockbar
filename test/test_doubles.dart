@@ -27,10 +27,15 @@ class FakeLockbarPlatform implements LockbarPlatform {
   int activateAppCalls = 0;
   int quitAppCalls = 0;
   int requestCalendarAccessCalls = 0;
+  int startKeepAwakeCalls = 0;
+  int startKeepAwakeIndefinitelyCalls = 0;
+  int stopKeepAwakeCalls = 0;
   int showSuggestionPanelCalls = 0;
   int updateSuggestionPanelCalls = 0;
   int hideSuggestionPanelCalls = 0;
+  bool keepAwakeStartSucceeds = true;
   String? lastNativeLocaleTag;
+  Duration? lastKeepAwakeDuration;
   PermissionState calendarPermissionState = PermissionState.notDetermined;
   SuggestionPanelData? lastSuggestionPanelData;
   Set<AiDataSource> lastRequestedSources = const <AiDataSource>{};
@@ -105,6 +110,29 @@ class FakeLockbarPlatform implements LockbarPlatform {
   @override
   Future<void> setNativeLocale(Locale locale) async {
     lastNativeLocaleTag = locale.toLanguageTag();
+  }
+
+  @override
+  Future<void> startKeepAwake(Duration duration) async {
+    startKeepAwakeCalls += 1;
+    lastKeepAwakeDuration = duration;
+    if (!keepAwakeStartSucceeds) {
+      throw Exception('startKeepAwake failed');
+    }
+  }
+
+  @override
+  Future<void> startKeepAwakeIndefinitely() async {
+    startKeepAwakeIndefinitelyCalls += 1;
+    lastKeepAwakeDuration = null;
+    if (!keepAwakeStartSucceeds) {
+      throw Exception('startKeepAwakeIndefinitely failed');
+    }
+  }
+
+  @override
+  Future<void> stopKeepAwake() async {
+    stopKeepAwakeCalls += 1;
   }
 
   @override

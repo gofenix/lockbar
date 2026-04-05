@@ -30,6 +30,12 @@ abstract class LockbarPlatform {
 
   Future<PermissionRequestResult> requestCalendarAccess();
 
+  Future<void> startKeepAwake(Duration duration);
+
+  Future<void> startKeepAwakeIndefinitely();
+
+  Future<void> stopKeepAwake();
+
   Stream<SuggestionPanelAction> get suggestionPanelActions;
 
   Future<void> showSuggestionPanel(SuggestionPanelData data);
@@ -148,6 +154,23 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
       'requestCalendarAccess',
     );
     return _parsePermissionRequestResult(rawResult);
+  }
+
+  @override
+  Future<void> startKeepAwake(Duration duration) {
+    return _channel.invokeMethod<void>('startKeepAwake', {
+      'durationSeconds': duration.inSeconds,
+    });
+  }
+
+  @override
+  Future<void> startKeepAwakeIndefinitely() {
+    return _channel.invokeMethod<void>('startKeepAwakeIndefinitely');
+  }
+
+  @override
+  Future<void> stopKeepAwake() {
+    return _channel.invokeMethod<void>('stopKeepAwake');
   }
 
   @override

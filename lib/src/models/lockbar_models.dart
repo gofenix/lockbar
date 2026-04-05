@@ -71,6 +71,11 @@ enum StatusMessageKey {
   focusSessionCancelled,
   delayedLockScheduled,
   delayedLockCancelled,
+  keepAwakeStarted,
+  keepAwakeStartedIndefinitely,
+  keepAwakeCancelled,
+  keepAwakeExpired,
+  keepAwakeFailed,
   workdayReviewStarted,
 }
 

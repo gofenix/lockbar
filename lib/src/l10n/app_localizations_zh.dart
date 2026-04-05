@@ -256,6 +256,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusDelayedLockCancelled => '延时锁屏已取消。';
 
   @override
+  String get statusKeepAwakeStarted => '接下来 1 小时会保持亮屏。';
+
+  @override
+  String get statusKeepAwakeStartedIndefinitely => '会一直保持亮屏，直到你手动停止。';
+
+  @override
+  String get statusKeepAwakeCancelled => '已停止保持亮屏。';
+
+  @override
+  String get statusKeepAwakeExpired => '保持亮屏已结束。';
+
+  @override
+  String get statusKeepAwakeFailed => '无法开始保持亮屏。';
+
+  @override
   String get statusWorkdayReviewStarted => '下班收尾已触发。';
 
   @override
@@ -612,6 +627,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aiCancelDelayedLockAction => '取消延时锁屏';
+
+  @override
+  String get keepAwakeAction => '保持亮屏…';
+
+  @override
+  String get keepAwakeFor30MinutesAction => '30 分钟';
+
+  @override
+  String get keepAwakeForOneHourAction => '1 小时';
+
+  @override
+  String get keepAwakeForTwoHoursAction => '2 小时';
+
+  @override
+  String get keepAwakeIndefinitelyAction => '一直保持亮屏';
+
+  @override
+  String get cancelKeepAwakeAction => '停止保持亮屏';
 
   @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';
@@ -1082,6 +1115,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get statusDelayedLockCancelled => '延时锁屏已取消。';
 
   @override
+  String get statusKeepAwakeStarted => '接下来 1 小时会保持亮屏。';
+
+  @override
+  String get statusKeepAwakeStartedIndefinitely => '会一直保持亮屏，直到你手动停止。';
+
+  @override
+  String get statusKeepAwakeCancelled => '已停止保持亮屏。';
+
+  @override
+  String get statusKeepAwakeExpired => '保持亮屏已结束。';
+
+  @override
+  String get statusKeepAwakeFailed => '无法开始保持亮屏。';
+
+  @override
   String get statusWorkdayReviewStarted => '下班收尾已触发。';
 
   @override
@@ -1438,6 +1486,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get aiCancelDelayedLockAction => '取消延时锁屏';
+
+  @override
+  String get keepAwakeAction => '保持亮屏…';
+
+  @override
+  String get keepAwakeFor30MinutesAction => '30 分钟';
+
+  @override
+  String get keepAwakeForOneHourAction => '1 小时';
+
+  @override
+  String get keepAwakeForTwoHoursAction => '2 小时';
+
+  @override
+  String get keepAwakeIndefinitelyAction => '一直保持亮屏';
+
+  @override
+  String get cancelKeepAwakeAction => '停止保持亮屏';
 
   @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';

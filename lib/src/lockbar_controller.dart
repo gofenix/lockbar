@@ -83,6 +83,7 @@ class LockbarController extends ChangeNotifier {
   List<ActionHistoryEntry> _actionHistory = const [];
   FocusSessionState? _focusSession;
   DelayedLockState? _delayedLock;
+  KeepAwakeSessionState? _keepAwakeSession;
   AiRecommendation? _activeSuggestion;
   AiRecommendation? _lastSuggestion;
   ContextSnapshot? _activeSuggestionSnapshot;
@@ -94,6 +95,7 @@ class LockbarController extends ChangeNotifier {
   DateTime? _lastEveningSuggestionDay;
   Timer? _focusTimer;
   Timer? _delayedLockTimer;
+  Timer? _keepAwakeTimer;
   Timer? _pollTimer;
 
   PermissionState get permissionState => _permissionState;
@@ -137,6 +139,7 @@ class LockbarController extends ChangeNotifier {
       _savedAiConnection?.model ?? aiInferenceClient.model;
   FocusSessionState? get focusSession => _focusSession;
   DelayedLockState? get delayedLock => _delayedLock;
+  KeepAwakeSessionState? get keepAwakeSession => _keepAwakeSession;
   AiRecommendation? get activeSuggestion => _activeSuggestion;
   AiRecommendation? get lastSuggestion => _lastSuggestion;
   bool get hasActiveSuggestion => _activeSuggestion != null;
@@ -261,6 +264,7 @@ class LockbarController extends ChangeNotifier {
       final result = await platform.lockNow();
       switch (result.status) {
         case LockResultStatus.success:
+          await _stopKeepAwakeSession(setStatus: false, recordAction: false);
           _setStatusKey(StatusMessageKey.lockCommandSent);
           await _recordAction('lock.now.primary');
           await _recordActiveSuggestionDecisionIfUnset(AiDecisionType.ignored);
@@ -305,6 +309,7 @@ class LockbarController extends ChangeNotifier {
       final result = await platform.lockNow();
       switch (result.status) {
         case LockResultStatus.success:
+          await _stopKeepAwakeSession(setStatus: false, recordAction: false);
           _setStatusKey(StatusMessageKey.lockCommandSent);
           await _recordAction('lock.now.settings');
           await _recordActiveSuggestionDecisionIfUnset(AiDecisionType.ignored);
@@ -662,6 +667,7 @@ class LockbarController extends ChangeNotifier {
   }
 
   Future<void> scheduleDelayedLock(Duration duration) async {
+    await _stopKeepAwakeSession(setStatus: false, recordAction: false);
     _delayedLockTimer?.cancel();
     final now = _now();
     _delayedLock = DelayedLockState(
@@ -683,6 +689,25 @@ class LockbarController extends ChangeNotifier {
     await _recordAction('lock.later.cancel');
     _setStatusKey(StatusMessageKey.delayedLockCancelled);
     notifyListeners();
+  }
+
+  Future<void> startKeepAwakeSession(Duration duration) async {
+    await _startKeepAwakeSession(
+      duration: duration,
+      statusKey: StatusMessageKey.keepAwakeStarted,
+      actionSuffix: '${duration.inMinutes}m',
+    );
+  }
+
+  Future<void> startKeepAwakeIndefinitely() async {
+    await _startKeepAwakeSession(
+      statusKey: StatusMessageKey.keepAwakeStartedIndefinitely,
+      actionSuffix: 'forever',
+    );
+  }
+
+  Future<void> cancelKeepAwakeSession() async {
+    await _stopKeepAwakeSession();
   }
 
   Future<void> acceptActiveSuggestionLockNow() async {
@@ -777,6 +802,8 @@ class LockbarController extends ChangeNotifier {
   void dispose() {
     _focusTimer?.cancel();
     _delayedLockTimer?.cancel();
+    _keepAwakeTimer?.cancel();
+    unawaited(platform.stopKeepAwake());
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -853,6 +880,69 @@ class LockbarController extends ChangeNotifier {
     _pollTimer?.cancel();
     _pollTimer = null;
     _lastSystemContext = null;
+  }
+
+  Future<void> _stopKeepAwakeSession({
+    bool setStatus = true,
+    bool recordAction = true,
+  }) async {
+    if (_keepAwakeSession == null) {
+      return;
+    }
+
+    _keepAwakeTimer?.cancel();
+    _keepAwakeTimer = null;
+    _keepAwakeSession = null;
+    await platform.stopKeepAwake();
+    if (recordAction) {
+      await _recordAction('screen.awake.cancel');
+    }
+    if (setStatus) {
+      _setStatusKey(StatusMessageKey.keepAwakeCancelled);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _startKeepAwakeSession({
+    Duration? duration,
+    required StatusMessageKey statusKey,
+    required String actionSuffix,
+  }) async {
+    await _stopKeepAwakeSession(setStatus: false, recordAction: false);
+
+    try {
+      if (duration == null) {
+        await platform.startKeepAwakeIndefinitely();
+      } else {
+        await platform.startKeepAwake(duration);
+      }
+    } catch (_) {
+      _setErrorKey(StatusMessageKey.keepAwakeFailed);
+      notifyListeners();
+      return;
+    }
+
+    if (_delayedLock != null) {
+      _delayedLockTimer?.cancel();
+      _delayedLock = null;
+    }
+
+    final now = _now();
+    _keepAwakeSession = KeepAwakeSessionState(
+      startedAt: now,
+      endsAt: duration == null ? null : now.add(duration),
+      durationMinutes: duration?.inMinutes,
+    );
+    _keepAwakeTimer?.cancel();
+    _keepAwakeTimer =
+        duration == null
+            ? null
+            : Timer(duration, () {
+                unawaited(_onKeepAwakeSessionFinished());
+              });
+    await _recordAction('screen.awake.start.$actionSuffix');
+    _setStatusKey(statusKey);
+    notifyListeners();
   }
 
   Set<AiDataSource> _enabledSystemDataSources() {
@@ -935,6 +1025,22 @@ class LockbarController extends ChangeNotifier {
     _delayedLock = null;
     notifyListeners();
     await lockNowFromSettings();
+  }
+
+  Future<void> _onKeepAwakeSessionFinished() async {
+    final session = _keepAwakeSession;
+    _keepAwakeSession = null;
+    _keepAwakeTimer?.cancel();
+    _keepAwakeTimer = null;
+    notifyListeners();
+    if (session == null) {
+      return;
+    }
+
+    await platform.stopKeepAwake();
+    await _recordAction('screen.awake.expire.${session.durationMinutes}m');
+    _setStatusKey(StatusMessageKey.keepAwakeExpired);
+    notifyListeners();
   }
 
   Future<void> _evaluateAiTrigger(

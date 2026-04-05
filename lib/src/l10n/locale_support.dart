@@ -139,6 +139,13 @@ String? statusMessageText(
       localizations.statusDelayedLockScheduled,
     StatusMessageKey.delayedLockCancelled =>
       localizations.statusDelayedLockCancelled,
+    StatusMessageKey.keepAwakeStarted => localizations.statusKeepAwakeStarted,
+    StatusMessageKey.keepAwakeStartedIndefinitely =>
+      localizations.statusKeepAwakeStartedIndefinitely,
+    StatusMessageKey.keepAwakeCancelled =>
+      localizations.statusKeepAwakeCancelled,
+    StatusMessageKey.keepAwakeExpired => localizations.statusKeepAwakeExpired,
+    StatusMessageKey.keepAwakeFailed => localizations.statusKeepAwakeFailed,
     StatusMessageKey.workdayReviewStarted =>
       localizations.statusWorkdayReviewStarted,
   };

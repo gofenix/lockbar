@@ -555,6 +555,36 @@ abstract class AppLocalizations {
   /// **'Delayed lock cancelled.'**
   String get statusDelayedLockCancelled;
 
+  /// No description provided for @statusKeepAwakeStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Display will stay awake for the next hour.'**
+  String get statusKeepAwakeStarted;
+
+  /// No description provided for @statusKeepAwakeStartedIndefinitely.
+  ///
+  /// In en, this message translates to:
+  /// **'Display will stay awake until you stop it.'**
+  String get statusKeepAwakeStartedIndefinitely;
+
+  /// No description provided for @statusKeepAwakeCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-awake session stopped.'**
+  String get statusKeepAwakeCancelled;
+
+  /// No description provided for @statusKeepAwakeExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-awake session ended.'**
+  String get statusKeepAwakeExpired;
+
+  /// No description provided for @statusKeepAwakeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the keep-awake session.'**
+  String get statusKeepAwakeFailed;
+
   /// No description provided for @statusWorkdayReviewStarted.
   ///
   /// In en, this message translates to:
@@ -1220,6 +1250,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel Delayed Lock'**
   String get aiCancelDelayedLockAction;
+
+  /// No description provided for @keepAwakeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Awake…'**
+  String get keepAwakeAction;
+
+  /// No description provided for @keepAwakeFor30MinutesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'30 Minutes'**
+  String get keepAwakeFor30MinutesAction;
+
+  /// No description provided for @keepAwakeForOneHourAction.
+  ///
+  /// In en, this message translates to:
+  /// **'1 Hour'**
+  String get keepAwakeForOneHourAction;
+
+  /// No description provided for @keepAwakeForTwoHoursAction.
+  ///
+  /// In en, this message translates to:
+  /// **'2 Hours'**
+  String get keepAwakeForTwoHoursAction;
+
+  /// No description provided for @keepAwakeIndefinitelyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Until Stopped'**
+  String get keepAwakeIndefinitelyAction;
+
+  /// No description provided for @cancelKeepAwakeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Keeping Awake'**
+  String get cancelKeepAwakeAction;
 
   /// No description provided for @aiHeadlineFocusEnded.
   ///

@@ -365,6 +365,7 @@ class MainFlutterWindow: NSWindow {
   private let networkMonitorQueue = DispatchQueue(label: "lockbar.network-monitor")
   private var networkReachable = false
   private var platformChannel: FlutterMethodChannel?
+  private var keepAwakeProcess: Process?
   private lazy var suggestionPanelController = SuggestionPanelController {
     [weak self] action in
     self?.emitSuggestionPanelAction(action)
@@ -387,6 +388,7 @@ class MainFlutterWindow: NSWindow {
   }
 
   deinit {
+    stopKeepAwake()
     networkMonitor.cancel()
   }
 
@@ -449,6 +451,7 @@ class MainFlutterWindow: NSWindow {
         self.activateApp()
         result(nil)
       case "quitApp":
+        self.stopKeepAwake()
         NSApp.terminate(nil)
         result(nil)
       case "setNativeLocale":
@@ -467,6 +470,13 @@ class MainFlutterWindow: NSWindow {
         result(self.currentCalendarPermissionState())
       case "requestCalendarAccess":
         self.requestCalendarAccess(result: result)
+      case "startKeepAwake":
+        self.startKeepAwake(arguments: call.arguments as? [String: Any], result: result)
+      case "startKeepAwakeIndefinitely":
+        self.startKeepAwakeIndefinitely(result: result)
+      case "stopKeepAwake":
+        self.stopKeepAwake()
+        result(nil)
       case "showSuggestionPanel":
         self.handleSuggestionPanel(arguments: call.arguments as? [String: Any], isUpdate: false)
         result(nil)
@@ -489,6 +499,90 @@ class MainFlutterWindow: NSWindow {
 
     let hasRequestedPermission = UserDefaults.standard.bool(forKey: lockbarPermissionRequestKey)
     return hasRequestedPermission ? "denied" : "notDetermined"
+  }
+
+  private func startKeepAwake(arguments: [String: Any]?, result: FlutterResult) {
+    guard let rawDuration = arguments?["durationSeconds"] as? Int, rawDuration > 0 else {
+      result(
+        FlutterError(
+          code: "invalid_keep_awake_duration",
+          message: "durationSeconds must be a positive integer.",
+          details: nil
+        )
+      )
+      return
+    }
+
+    stopKeepAwake()
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+    process.arguments = ["-d", "-i", "-t", String(rawDuration)]
+    process.terminationHandler = { [weak self, weak process] _ in
+      DispatchQueue.main.async {
+        guard let self, let process else { return }
+        if self.keepAwakeProcess === process {
+          self.keepAwakeProcess = nil
+        }
+      }
+    }
+
+    do {
+      try process.run()
+      keepAwakeProcess = process
+      result(nil)
+    } catch {
+      keepAwakeProcess = nil
+      result(
+        FlutterError(
+          code: "keep_awake_start_failed",
+          message: "Failed to start caffeinate.",
+          details: error.localizedDescription
+        )
+      )
+    }
+  }
+
+  private func startKeepAwakeIndefinitely(result: FlutterResult) {
+    stopKeepAwake()
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+    process.arguments = ["-d", "-i"]
+    process.terminationHandler = { [weak self, weak process] _ in
+      DispatchQueue.main.async {
+        guard let self, let process else { return }
+        if self.keepAwakeProcess === process {
+          self.keepAwakeProcess = nil
+        }
+      }
+    }
+
+    do {
+      try process.run()
+      keepAwakeProcess = process
+      result(nil)
+    } catch {
+      keepAwakeProcess = nil
+      result(
+        FlutterError(
+          code: "keep_awake_start_failed",
+          message: "Failed to start caffeinate.",
+          details: error.localizedDescription
+        )
+      )
+    }
+  }
+
+  private func stopKeepAwake() {
+    guard let process = keepAwakeProcess else {
+      return
+    }
+
+    keepAwakeProcess = nil
+    if process.isRunning {
+      process.terminate()
+    }
   }
 
   private func requestPermission() -> String {

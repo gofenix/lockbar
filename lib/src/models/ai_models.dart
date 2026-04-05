@@ -418,6 +418,20 @@ class DelayedLockState {
   final int durationSeconds;
 }
 
+class KeepAwakeSessionState {
+  const KeepAwakeSessionState({
+    required this.startedAt,
+    this.endsAt,
+    this.durationMinutes,
+  });
+
+  final DateTime startedAt;
+  final DateTime? endsAt;
+  final int? durationMinutes;
+
+  bool get isIndefinite => endsAt == null;
+}
+
 class ActionHistoryEntry {
   const ActionHistoryEntry({required this.action, required this.occurredAt});
 

@@ -186,6 +186,42 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       );
     }
 
+    items.add(
+      MenuItem.submenu(
+        key: _MenuAction.keepAwake.name,
+        label: localizations.keepAwakeAction,
+        submenu: Menu(
+          items: [
+            MenuItem(
+              key: _MenuAction.keepAwake30Minutes.name,
+              label: localizations.keepAwakeFor30MinutesAction,
+            ),
+            MenuItem(
+              key: _MenuAction.keepAwake1Hour.name,
+              label: localizations.keepAwakeForOneHourAction,
+            ),
+            MenuItem(
+              key: _MenuAction.keepAwake2Hours.name,
+              label: localizations.keepAwakeForTwoHoursAction,
+            ),
+            MenuItem(
+              key: _MenuAction.keepAwakeIndefinitely.name,
+              label: localizations.keepAwakeIndefinitelyAction,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (controller.keepAwakeSession != null) {
+      items.add(
+        MenuItem(
+          key: _MenuAction.cancelKeepAwake.name,
+          label: localizations.cancelKeepAwakeAction,
+        ),
+      );
+    }
+
     items.add(MenuItem.separator());
     items.add(
       MenuItem(key: _MenuAction.lockNow.name, label: localizations.lockNow),
@@ -379,6 +415,27 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       case 'cancelDelayedLock':
         unawaited(controller.cancelDelayedLock());
         break;
+      case 'keepAwake30Minutes':
+        unawaited(
+          controller.startKeepAwakeSession(const Duration(minutes: 30)),
+        );
+        break;
+      case 'keepAwake1Hour':
+        unawaited(
+          controller.startKeepAwakeSession(const Duration(hours: 1)),
+        );
+        break;
+      case 'keepAwake2Hours':
+        unawaited(
+          controller.startKeepAwakeSession(const Duration(hours: 2)),
+        );
+        break;
+      case 'keepAwakeIndefinitely':
+        unawaited(controller.startKeepAwakeIndefinitely());
+        break;
+      case 'cancelKeepAwake':
+        unawaited(controller.cancelKeepAwakeSession());
+        break;
       case 'reviewSuggestion':
         controller.reopenActiveSuggestionCard();
         break;
@@ -433,6 +490,12 @@ enum _MenuAction {
   lockIn2Minutes,
   lockIn5Minutes,
   cancelDelayedLock,
+  keepAwake,
+  keepAwake30Minutes,
+  keepAwake1Hour,
+  keepAwake2Hours,
+  keepAwakeIndefinitely,
+  cancelKeepAwake,
   lockNow,
   launchAtLogin,
   openSettings,

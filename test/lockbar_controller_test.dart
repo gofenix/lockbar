@@ -170,6 +170,129 @@ void main() {
     );
   });
 
+  test('keep awake session starts for one hour and can be cancelled', () async {
+    final platform = FakeLockbarPlatform();
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0),
+    );
+
+    await controller.initialize();
+    await controller.startKeepAwakeSession(const Duration(hours: 1));
+
+    expect(platform.startKeepAwakeCalls, 1);
+    expect(platform.lastKeepAwakeDuration, const Duration(hours: 1));
+    expect(controller.keepAwakeSession, isNotNull);
+    expect(
+      statusMessageText(
+        localizationsForLocale(controller.effectiveLocale),
+        controller.statusMessage,
+      ),
+      'Display will stay awake for the next hour.',
+    );
+
+    await controller.cancelKeepAwakeSession();
+
+    expect(controller.keepAwakeSession, isNull);
+    expect(platform.stopKeepAwakeCalls, 1);
+    expect(
+      statusMessageText(
+        localizationsForLocale(controller.effectiveLocale),
+        controller.statusMessage,
+      ),
+      'Keep-awake session stopped.',
+    );
+  });
+
+  test('starting keep awake clears an existing delayed lock', () async {
+    final platform = FakeLockbarPlatform();
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+    );
+
+    await controller.initialize();
+    await controller.scheduleDelayedLock(const Duration(minutes: 2));
+    expect(controller.delayedLock, isNotNull);
+
+    await controller.startKeepAwakeSession(const Duration(hours: 1));
+
+    expect(controller.delayedLock, isNull);
+    expect(controller.keepAwakeSession, isNotNull);
+    expect(platform.startKeepAwakeCalls, 1);
+  });
+
+  test('keep awake can run indefinitely until manually stopped', () async {
+    final platform = FakeLockbarPlatform();
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0),
+    );
+
+    await controller.initialize();
+    await controller.startKeepAwakeIndefinitely();
+
+    expect(platform.startKeepAwakeIndefinitelyCalls, 1);
+    expect(controller.keepAwakeSession, isNotNull);
+    expect(controller.keepAwakeSession!.isIndefinite, isTrue);
+    expect(
+      statusMessageText(
+        localizationsForLocale(controller.effectiveLocale),
+        controller.statusMessage,
+      ),
+      'Display will stay awake until you stop it.',
+    );
+  });
+
+  test(
+    'failed keep awake start leaves delayed lock intact and surfaces an error',
+    () async {
+      final platform = FakeLockbarPlatform()..keepAwakeStartSucceeds = false;
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+
+      await controller.initialize();
+      await controller.scheduleDelayedLock(const Duration(minutes: 2));
+
+      await controller.startKeepAwakeSession(const Duration(hours: 1));
+
+      expect(controller.delayedLock, isNotNull);
+      expect(controller.keepAwakeSession, isNull);
+      expect(controller.hasError, isTrue);
+      expect(
+        statusMessageText(
+          localizationsForLocale(controller.effectiveLocale),
+          controller.statusMessage,
+        ),
+        'Could not start the keep-awake session.',
+      );
+    },
+  );
+
   test(
     'AI stays off and does not poll context until explicitly enabled',
     () async {

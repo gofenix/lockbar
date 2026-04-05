@@ -283,6 +283,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusDelayedLockCancelled => 'Delayed lock cancelled.';
 
   @override
+  String get statusKeepAwakeStarted =>
+      'Display will stay awake for the next hour.';
+
+  @override
+  String get statusKeepAwakeStartedIndefinitely =>
+      'Display will stay awake until you stop it.';
+
+  @override
+  String get statusKeepAwakeCancelled => 'Keep-awake session stopped.';
+
+  @override
+  String get statusKeepAwakeExpired => 'Keep-awake session ended.';
+
+  @override
+  String get statusKeepAwakeFailed => 'Could not start the keep-awake session.';
+
+  @override
   String get statusWorkdayReviewStarted => 'Workday wrap-up started.';
 
   @override
@@ -645,6 +662,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiCancelDelayedLockAction => 'Cancel Delayed Lock';
+
+  @override
+  String get keepAwakeAction => 'Keep Awake…';
+
+  @override
+  String get keepAwakeFor30MinutesAction => '30 Minutes';
+
+  @override
+  String get keepAwakeForOneHourAction => '1 Hour';
+
+  @override
+  String get keepAwakeForTwoHoursAction => '2 Hours';
+
+  @override
+  String get keepAwakeIndefinitelyAction => 'Until Stopped';
+
+  @override
+  String get cancelKeepAwakeAction => 'Stop Keeping Awake';
 
   @override
   String get aiHeadlineFocusEnded => 'Focus block complete.';
