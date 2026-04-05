@@ -406,6 +406,32 @@ class FocusSessionState {
   final int durationMinutes;
 }
 
+enum KeepAwakePreset {
+  thirtyMinutes(duration: Duration(minutes: 30)),
+  oneHour(duration: Duration(hours: 1)),
+  twoHours(duration: Duration(hours: 2)),
+  indefinite(duration: null);
+
+  const KeepAwakePreset({required this.duration});
+
+  final Duration? duration;
+
+  bool get isIndefinite => duration == null;
+
+  static KeepAwakePreset fromDuration(Duration duration) {
+    return switch (duration.inMinutes) {
+      30 => KeepAwakePreset.thirtyMinutes,
+      60 => KeepAwakePreset.oneHour,
+      120 => KeepAwakePreset.twoHours,
+      _ => throw ArgumentError.value(
+        duration,
+        'duration',
+        'Unsupported keep-awake duration.',
+      ),
+    };
+  }
+}
+
 class DelayedLockState {
   const DelayedLockState({
     required this.scheduledAt,
@@ -421,11 +447,13 @@ class DelayedLockState {
 class KeepAwakeSessionState {
   const KeepAwakeSessionState({
     required this.startedAt,
+    required this.preset,
     this.endsAt,
     this.durationMinutes,
   });
 
   final DateTime startedAt;
+  final KeepAwakePreset preset;
   final DateTime? endsAt;
   final int? durationMinutes;
 

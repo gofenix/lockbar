@@ -96,6 +96,7 @@ class LockbarController extends ChangeNotifier {
   Timer? _focusTimer;
   Timer? _delayedLockTimer;
   Timer? _keepAwakeTimer;
+  Timer? _keepAwakeTicker;
   Timer? _pollTimer;
 
   PermissionState get permissionState => _permissionState;
@@ -140,6 +141,21 @@ class LockbarController extends ChangeNotifier {
   FocusSessionState? get focusSession => _focusSession;
   DelayedLockState? get delayedLock => _delayedLock;
   KeepAwakeSessionState? get keepAwakeSession => _keepAwakeSession;
+  Duration? get keepAwakeRemaining {
+    final endsAt = _keepAwakeSession?.endsAt;
+    if (endsAt == null) {
+      return null;
+    }
+
+    final remaining = endsAt.difference(_now());
+    if (remaining.isNegative) {
+      return Duration.zero;
+    }
+    return remaining;
+  }
+
+  bool get isKeepAwakeActive => _keepAwakeSession != null;
+  bool get isKeepAwakeIndefinite => _keepAwakeSession?.isIndefinite ?? false;
   AiRecommendation? get activeSuggestion => _activeSuggestion;
   AiRecommendation? get lastSuggestion => _lastSuggestion;
   bool get hasActiveSuggestion => _activeSuggestion != null;
@@ -693,16 +709,16 @@ class LockbarController extends ChangeNotifier {
 
   Future<void> startKeepAwakeSession(Duration duration) async {
     await _startKeepAwakeSession(
+      preset: KeepAwakePreset.fromDuration(duration),
       duration: duration,
       statusKey: StatusMessageKey.keepAwakeStarted,
-      actionSuffix: '${duration.inMinutes}m',
     );
   }
 
   Future<void> startKeepAwakeIndefinitely() async {
     await _startKeepAwakeSession(
+      preset: KeepAwakePreset.indefinite,
       statusKey: StatusMessageKey.keepAwakeStartedIndefinitely,
-      actionSuffix: 'forever',
     );
   }
 
@@ -803,6 +819,7 @@ class LockbarController extends ChangeNotifier {
     _focusTimer?.cancel();
     _delayedLockTimer?.cancel();
     _keepAwakeTimer?.cancel();
+    _keepAwakeTicker?.cancel();
     unawaited(platform.stopKeepAwake());
     _pollTimer?.cancel();
     super.dispose();
@@ -891,7 +908,9 @@ class LockbarController extends ChangeNotifier {
     }
 
     _keepAwakeTimer?.cancel();
+    _keepAwakeTicker?.cancel();
     _keepAwakeTimer = null;
+    _keepAwakeTicker = null;
     _keepAwakeSession = null;
     await platform.stopKeepAwake();
     if (recordAction) {
@@ -904,9 +923,9 @@ class LockbarController extends ChangeNotifier {
   }
 
   Future<void> _startKeepAwakeSession({
+    required KeepAwakePreset preset,
     Duration? duration,
     required StatusMessageKey statusKey,
-    required String actionSuffix,
   }) async {
     await _stopKeepAwakeSession(setStatus: false, recordAction: false);
 
@@ -930,17 +949,28 @@ class LockbarController extends ChangeNotifier {
     final now = _now();
     _keepAwakeSession = KeepAwakeSessionState(
       startedAt: now,
+      preset: preset,
       endsAt: duration == null ? null : now.add(duration),
       durationMinutes: duration?.inMinutes,
     );
     _keepAwakeTimer?.cancel();
-    _keepAwakeTimer =
-        duration == null
-            ? null
-            : Timer(duration, () {
-                unawaited(_onKeepAwakeSessionFinished());
-              });
-    await _recordAction('screen.awake.start.$actionSuffix');
+    _keepAwakeTicker?.cancel();
+    _keepAwakeTimer = duration == null
+        ? null
+        : Timer(duration, () {
+            unawaited(_onKeepAwakeSessionFinished());
+          });
+    _keepAwakeTicker = duration == null
+        ? null
+        : Timer.periodic(const Duration(seconds: 1), (_) {
+            if (_keepAwakeSession == null) {
+              _keepAwakeTicker?.cancel();
+              _keepAwakeTicker = null;
+              return;
+            }
+            notifyListeners();
+          });
+    await _recordAction('screen.awake.start.${_keepAwakeActionSuffix(preset)}');
     _setStatusKey(statusKey);
     notifyListeners();
   }
@@ -1031,16 +1061,29 @@ class LockbarController extends ChangeNotifier {
     final session = _keepAwakeSession;
     _keepAwakeSession = null;
     _keepAwakeTimer?.cancel();
+    _keepAwakeTicker?.cancel();
     _keepAwakeTimer = null;
+    _keepAwakeTicker = null;
     notifyListeners();
     if (session == null) {
       return;
     }
 
     await platform.stopKeepAwake();
-    await _recordAction('screen.awake.expire.${session.durationMinutes}m');
+    await _recordAction(
+      'screen.awake.expire.${_keepAwakeActionSuffix(session.preset)}',
+    );
     _setStatusKey(StatusMessageKey.keepAwakeExpired);
     notifyListeners();
+  }
+
+  String _keepAwakeActionSuffix(KeepAwakePreset preset) {
+    return switch (preset) {
+      KeepAwakePreset.thirtyMinutes => '30m',
+      KeepAwakePreset.oneHour => '60m',
+      KeepAwakePreset.twoHours => '120m',
+      KeepAwakePreset.indefinite => 'forever',
+    };
   }
 
   Future<void> _evaluateAiTrigger(

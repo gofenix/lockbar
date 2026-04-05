@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -88,6 +89,11 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _syncContextMenu() async {
+    await trayManager.setContextMenu(buildContextMenu());
+  }
+
+  @visibleForTesting
+  Menu buildContextMenu() {
     final localizations = localizationsForLocale(controller.effectiveLocale);
     final items = <MenuItem>[];
 
@@ -186,30 +192,45 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       );
     }
 
+    final keepAwakeSession = controller.keepAwakeSession;
+    final keepAwakeRemaining = controller.keepAwakeRemaining;
+    final keepAwakeItems = <MenuItem>[
+      if (keepAwakeSession != null)
+        MenuItem(
+          label: keepAwakeMenuStatusLabel(
+            localizations,
+            keepAwakeSession,
+            keepAwakeRemaining,
+          ),
+          disabled: true,
+        ),
+      if (keepAwakeSession != null) MenuItem.separator(),
+      MenuItem.checkbox(
+        key: _MenuAction.keepAwake30Minutes.name,
+        label: localizations.keepAwakeFor30MinutesAction,
+        checked: keepAwakeSession?.preset == KeepAwakePreset.thirtyMinutes,
+      ),
+      MenuItem.checkbox(
+        key: _MenuAction.keepAwake1Hour.name,
+        label: localizations.keepAwakeForOneHourAction,
+        checked: keepAwakeSession?.preset == KeepAwakePreset.oneHour,
+      ),
+      MenuItem.checkbox(
+        key: _MenuAction.keepAwake2Hours.name,
+        label: localizations.keepAwakeForTwoHoursAction,
+        checked: keepAwakeSession?.preset == KeepAwakePreset.twoHours,
+      ),
+      MenuItem.checkbox(
+        key: _MenuAction.keepAwakeIndefinitely.name,
+        label: localizations.keepAwakeIndefinitelyAction,
+        checked: keepAwakeSession?.preset == KeepAwakePreset.indefinite,
+      ),
+    ];
     items.add(
       MenuItem.submenu(
         key: _MenuAction.keepAwake.name,
         label: localizations.keepAwakeAction,
-        submenu: Menu(
-          items: [
-            MenuItem(
-              key: _MenuAction.keepAwake30Minutes.name,
-              label: localizations.keepAwakeFor30MinutesAction,
-            ),
-            MenuItem(
-              key: _MenuAction.keepAwake1Hour.name,
-              label: localizations.keepAwakeForOneHourAction,
-            ),
-            MenuItem(
-              key: _MenuAction.keepAwake2Hours.name,
-              label: localizations.keepAwakeForTwoHoursAction,
-            ),
-            MenuItem(
-              key: _MenuAction.keepAwakeIndefinitely.name,
-              label: localizations.keepAwakeIndefinitelyAction,
-            ),
-          ],
-        ),
+        submenu: Menu(items: keepAwakeItems),
       ),
     );
 
@@ -247,7 +268,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       MenuItem(key: _MenuAction.quit.name, label: localizations.quitAction),
     );
 
-    await trayManager.setContextMenu(Menu(items: items));
+    return Menu(items: items);
   }
 
   Future<void> _handleControllerChanged() async {
@@ -421,14 +442,10 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
         );
         break;
       case 'keepAwake1Hour':
-        unawaited(
-          controller.startKeepAwakeSession(const Duration(hours: 1)),
-        );
+        unawaited(controller.startKeepAwakeSession(const Duration(hours: 1)));
         break;
       case 'keepAwake2Hours':
-        unawaited(
-          controller.startKeepAwakeSession(const Duration(hours: 2)),
-        );
+        unawaited(controller.startKeepAwakeSession(const Duration(hours: 2)));
         break;
       case 'keepAwakeIndefinitely':
         unawaited(controller.startKeepAwakeIndefinitely());

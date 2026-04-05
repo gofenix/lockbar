@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lockbar/src/l10n/locale_support.dart';
@@ -189,12 +190,13 @@ void main() {
     expect(platform.startKeepAwakeCalls, 1);
     expect(platform.lastKeepAwakeDuration, const Duration(hours: 1));
     expect(controller.keepAwakeSession, isNotNull);
+    expect(controller.keepAwakeSession?.preset, KeepAwakePreset.oneHour);
     expect(
       statusMessageText(
         localizationsForLocale(controller.effectiveLocale),
         controller.statusMessage,
       ),
-      'Display will stay awake for the next hour.',
+      'Keep-awake started.',
     );
 
     await controller.cancelKeepAwakeSession();
@@ -233,6 +235,114 @@ void main() {
     expect(platform.startKeepAwakeCalls, 1);
   });
 
+  test(
+    'scheduling delayed lock clears an existing keep awake session',
+    () async {
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted;
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+
+      await controller.initialize();
+      await controller.startKeepAwakeSession(const Duration(hours: 1));
+      expect(controller.keepAwakeSession, isNotNull);
+
+      await controller.scheduleDelayedLock(const Duration(minutes: 2));
+
+      expect(controller.keepAwakeSession, isNull);
+      expect(controller.delayedLock, isNotNull);
+      expect(platform.stopKeepAwakeCalls, 1);
+    },
+  );
+
+  test('locking now clears an existing keep awake session', () async {
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted
+      ..lockResult = const LockResult(status: LockResultStatus.success);
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+    );
+
+    await controller.initialize();
+    await controller.startKeepAwakeSession(const Duration(hours: 1));
+    expect(controller.keepAwakeSession, isNotNull);
+
+    await controller.lockNowFromSettings();
+
+    expect(controller.keepAwakeSession, isNull);
+    expect(platform.stopKeepAwakeCalls, 1);
+  });
+
+  test('finite keep awake session ticks down and expires', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final platform = FakeLockbarPlatform();
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+      controller.startKeepAwakeSession(const Duration(minutes: 30));
+      async.flushMicrotasks();
+
+      var listenerCalls = 0;
+      controller.addListener(() {
+        listenerCalls += 1;
+      });
+
+      expect(
+        controller.keepAwakeSession?.preset,
+        KeepAwakePreset.thirtyMinutes,
+      );
+      expect(controller.keepAwakeRemaining, const Duration(minutes: 30));
+
+      now = now.add(const Duration(seconds: 1));
+      async.elapse(const Duration(seconds: 1));
+      async.flushMicrotasks();
+
+      expect(listenerCalls, greaterThan(0));
+      expect(
+        controller.keepAwakeRemaining,
+        const Duration(minutes: 29, seconds: 59),
+      );
+
+      now = now.add(const Duration(minutes: 29, seconds: 59));
+      async.elapse(const Duration(minutes: 29, seconds: 59));
+      async.flushMicrotasks();
+
+      expect(controller.keepAwakeSession, isNull);
+      expect(platform.stopKeepAwakeCalls, 1);
+      expect(
+        statusMessageText(
+          localizationsForLocale(controller.effectiveLocale),
+          controller.statusMessage,
+        ),
+        'Keep-awake session ended.',
+      );
+    });
+  });
+
   test('keep awake can run indefinitely until manually stopped', () async {
     final platform = FakeLockbarPlatform();
     final controller = LockbarController(
@@ -252,13 +362,49 @@ void main() {
     expect(platform.startKeepAwakeIndefinitelyCalls, 1);
     expect(controller.keepAwakeSession, isNotNull);
     expect(controller.keepAwakeSession!.isIndefinite, isTrue);
+    expect(controller.keepAwakeSession?.preset, KeepAwakePreset.indefinite);
     expect(
       statusMessageText(
         localizationsForLocale(controller.effectiveLocale),
         controller.statusMessage,
       ),
-      'Display will stay awake until you stop it.',
+      'Keep-awake started until you stop it.',
     );
+  });
+
+  test('indefinite keep awake does not start a countdown ticker', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+
+      var listenerCalls = 0;
+      controller.addListener(() {
+        listenerCalls += 1;
+      });
+
+      controller.startKeepAwakeIndefinitely();
+      async.flushMicrotasks();
+      final callsAfterStart = listenerCalls;
+
+      now = now.add(const Duration(seconds: 5));
+      async.elapse(const Duration(seconds: 5));
+      async.flushMicrotasks();
+
+      expect(controller.keepAwakeRemaining, isNull);
+      expect(listenerCalls, callsAfterStart);
+    });
   });
 
   test(

@@ -558,13 +558,13 @@ abstract class AppLocalizations {
   /// No description provided for @statusKeepAwakeStarted.
   ///
   /// In en, this message translates to:
-  /// **'Display will stay awake for the next hour.'**
+  /// **'Keep-awake started.'**
   String get statusKeepAwakeStarted;
 
   /// No description provided for @statusKeepAwakeStartedIndefinitely.
   ///
   /// In en, this message translates to:
-  /// **'Display will stay awake until you stop it.'**
+  /// **'Keep-awake started until you stop it.'**
   String get statusKeepAwakeStartedIndefinitely;
 
   /// No description provided for @statusKeepAwakeCancelled.
@@ -1286,6 +1286,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop Keeping Awake'**
   String get cancelKeepAwakeAction;
+
+  /// No description provided for @keepAwakeIdleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-awake is off.'**
+  String get keepAwakeIdleLabel;
+
+  /// No description provided for @keepAwakeRunningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-awake active: {duration}'**
+  String keepAwakeRunningLabel(Object duration);
+
+  /// No description provided for @keepAwakeRunningIndefinitelyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep-awake active: until you stop it.'**
+  String get keepAwakeRunningIndefinitelyLabel;
+
+  /// No description provided for @keepAwakeMenuStatusRunningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: keep awake, {duration} remaining'**
+  String keepAwakeMenuStatusRunningLabel(Object duration);
+
+  /// No description provided for @keepAwakeMenuStatusIndefinitelyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: keep awake until stopped'**
+  String get keepAwakeMenuStatusIndefinitelyLabel;
 
   /// No description provided for @aiHeadlineFocusEnded.
   ///

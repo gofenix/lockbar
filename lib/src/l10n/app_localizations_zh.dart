@@ -256,10 +256,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusDelayedLockCancelled => '延时锁屏已取消。';
 
   @override
-  String get statusKeepAwakeStarted => '接下来 1 小时会保持亮屏。';
+  String get statusKeepAwakeStarted => '已开始保持亮屏。';
 
   @override
-  String get statusKeepAwakeStartedIndefinitely => '会一直保持亮屏，直到你手动停止。';
+  String get statusKeepAwakeStartedIndefinitely => '已开始保持亮屏，直到你手动停止。';
 
   @override
   String get statusKeepAwakeCancelled => '已停止保持亮屏。';
@@ -645,6 +645,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cancelKeepAwakeAction => '停止保持亮屏';
+
+  @override
+  String get keepAwakeIdleLabel => '当前未保持亮屏。';
+
+  @override
+  String keepAwakeRunningLabel(Object duration) {
+    return '保持亮屏进行中：剩余 $duration';
+  }
+
+  @override
+  String get keepAwakeRunningIndefinitelyLabel => '保持亮屏进行中：直到你手动停止';
+
+  @override
+  String keepAwakeMenuStatusRunningLabel(Object duration) {
+    return '当前：保持亮屏，剩余 $duration';
+  }
+
+  @override
+  String get keepAwakeMenuStatusIndefinitelyLabel => '当前：一直保持亮屏';
 
   @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';
@@ -1115,10 +1134,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get statusDelayedLockCancelled => '延时锁屏已取消。';
 
   @override
-  String get statusKeepAwakeStarted => '接下来 1 小时会保持亮屏。';
+  String get statusKeepAwakeStarted => '已开始保持亮屏。';
 
   @override
-  String get statusKeepAwakeStartedIndefinitely => '会一直保持亮屏，直到你手动停止。';
+  String get statusKeepAwakeStartedIndefinitely => '已开始保持亮屏，直到你手动停止。';
 
   @override
   String get statusKeepAwakeCancelled => '已停止保持亮屏。';
@@ -1504,6 +1523,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get cancelKeepAwakeAction => '停止保持亮屏';
+
+  @override
+  String get keepAwakeIdleLabel => '当前未保持亮屏。';
+
+  @override
+  String keepAwakeRunningLabel(Object duration) {
+    return '保持亮屏进行中：剩余 $duration';
+  }
+
+  @override
+  String get keepAwakeRunningIndefinitelyLabel => '保持亮屏进行中：直到你手动停止';
+
+  @override
+  String keepAwakeMenuStatusRunningLabel(Object duration) {
+    return '当前：保持亮屏，剩余 $duration';
+  }
+
+  @override
+  String get keepAwakeMenuStatusIndefinitelyLabel => '当前：一直保持亮屏';
 
   @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';

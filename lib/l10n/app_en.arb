@@ -91,8 +91,8 @@
   "statusFocusSessionCancelled": "Focus session cancelled.",
   "statusDelayedLockScheduled": "Delayed lock scheduled.",
   "statusDelayedLockCancelled": "Delayed lock cancelled.",
-  "statusKeepAwakeStarted": "Display will stay awake for the next hour.",
-  "statusKeepAwakeStartedIndefinitely": "Display will stay awake until you stop it.",
+  "statusKeepAwakeStarted": "Keep-awake started.",
+  "statusKeepAwakeStartedIndefinitely": "Keep-awake started until you stop it.",
   "statusKeepAwakeCancelled": "Keep-awake session stopped.",
   "statusKeepAwakeExpired": "Keep-awake session ended.",
   "statusKeepAwakeFailed": "Could not start the keep-awake session.",
@@ -259,6 +259,21 @@
   "keepAwakeForTwoHoursAction": "2 Hours",
   "keepAwakeIndefinitelyAction": "Until Stopped",
   "cancelKeepAwakeAction": "Stop Keeping Awake",
+  "keepAwakeIdleLabel": "Keep-awake is off.",
+  "keepAwakeRunningLabel": "Keep-awake active: {duration}",
+  "@keepAwakeRunningLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "keepAwakeRunningIndefinitelyLabel": "Keep-awake active: until you stop it.",
+  "keepAwakeMenuStatusRunningLabel": "Current: keep awake, {duration} remaining",
+  "@keepAwakeMenuStatusRunningLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "keepAwakeMenuStatusIndefinitelyLabel": "Current: keep awake until stopped",
   "aiHeadlineFocusEnded": "Focus block complete.",
   "aiReasonFocusEndedFresh": "You just closed a focus block. If you are stepping away, this is the cleanest moment to lock.",
   "aiReasonFocusEndedBuffer": "You usually leave yourself a small buffer after deep work. Lock now if you're done, or take the short runway again.",

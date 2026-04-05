@@ -151,6 +151,47 @@ String? statusMessageText(
   };
 }
 
+String formatClockDuration(Duration duration) {
+  final totalSeconds = duration.inSeconds < 0 ? 0 : duration.inSeconds;
+  final hours = totalSeconds ~/ 3600;
+  final minutes = (totalSeconds % 3600) ~/ 60;
+  final seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+String keepAwakeStatusLabel(
+  AppLocalizations localizations,
+  KeepAwakeSessionState? session,
+  Duration? remaining,
+) {
+  if (session == null) {
+    return localizations.keepAwakeIdleLabel;
+  }
+  if (session.isIndefinite) {
+    return localizations.keepAwakeRunningIndefinitelyLabel;
+  }
+  return localizations.keepAwakeRunningLabel(
+    formatClockDuration(remaining ?? Duration.zero),
+  );
+}
+
+String keepAwakeMenuStatusLabel(
+  AppLocalizations localizations,
+  KeepAwakeSessionState session,
+  Duration? remaining,
+) {
+  if (session.isIndefinite) {
+    return localizations.keepAwakeMenuStatusIndefinitelyLabel;
+  }
+  return localizations.keepAwakeMenuStatusRunningLabel(
+    formatClockDuration(remaining ?? Duration.zero),
+  );
+}
+
 String aiConnectionStatusLabel(
   AppLocalizations localizations,
   AiConnectionStatus status,

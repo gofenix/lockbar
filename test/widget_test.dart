@@ -179,4 +179,67 @@ void main() {
     expect(find.text('AI Returned'), findsOneWidget);
     expect(find.text('Outcome'), findsOneWidget);
   });
+
+  testWidgets('settings window shows keep-awake controls and live countdown', (
+    WidgetTester tester,
+  ) async {
+    var now = DateTime(2026, 4, 5, 13, 0, 0);
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
+      launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => now,
+    );
+
+    await tester.pumpWidget(LockbarApp(controller: controller));
+    await tester.pumpAndSettle();
+    await controller.startKeepAwakeSession(const Duration(minutes: 30));
+    await tester.pump();
+
+    expect(find.text('30 Minutes'), findsOneWidget);
+    expect(find.text('1 Hour'), findsOneWidget);
+    expect(find.text('2 Hours'), findsOneWidget);
+    expect(find.text('Until Stopped'), findsOneWidget);
+    expect(find.text('Stop Keeping Awake'), findsOneWidget);
+    expect(find.text('Keep-awake active: 30:00'), findsOneWidget);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Keep-awake active: 29:59'), findsOneWidget);
+  });
+
+  testWidgets('settings window shows indefinite and idle keep-awake states', (
+    WidgetTester tester,
+  ) async {
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
+      launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+
+    await tester.pumpWidget(LockbarApp(controller: controller));
+    await tester.pumpAndSettle();
+    await controller.startKeepAwakeIndefinitely();
+    await tester.pump();
+
+    expect(find.text('Keep-awake active: until you stop it.'), findsOneWidget);
+    expect(find.text('Stop Keeping Awake'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Stop Keeping Awake'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stop Keeping Awake'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Keep-awake is off.'), findsOneWidget);
+  });
 }

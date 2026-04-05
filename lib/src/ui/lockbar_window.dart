@@ -223,6 +223,7 @@ class _ManualActions extends StatelessWidget {
     final localizations = AppLocalizations.of(context);
     final focusSession = controller.focusSession;
     final delayedLock = controller.delayedLock;
+    final keepAwakeSession = controller.keepAwakeSession;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,6 +272,35 @@ class _ManualActions extends StatelessWidget {
                 onPressed: controller.cancelDelayedLock,
                 child: Text(localizations.aiCancelDelayedLockAction),
               ),
+            _KeepAwakeActionButton(
+              label: localizations.keepAwakeFor30MinutesAction,
+              selected:
+                  keepAwakeSession?.preset == KeepAwakePreset.thirtyMinutes,
+              onPressed: () =>
+                  controller.startKeepAwakeSession(const Duration(minutes: 30)),
+            ),
+            _KeepAwakeActionButton(
+              label: localizations.keepAwakeForOneHourAction,
+              selected: keepAwakeSession?.preset == KeepAwakePreset.oneHour,
+              onPressed: () =>
+                  controller.startKeepAwakeSession(const Duration(hours: 1)),
+            ),
+            _KeepAwakeActionButton(
+              label: localizations.keepAwakeForTwoHoursAction,
+              selected: keepAwakeSession?.preset == KeepAwakePreset.twoHours,
+              onPressed: () =>
+                  controller.startKeepAwakeSession(const Duration(hours: 2)),
+            ),
+            _KeepAwakeActionButton(
+              label: localizations.keepAwakeIndefinitelyAction,
+              selected: keepAwakeSession?.preset == KeepAwakePreset.indefinite,
+              onPressed: controller.startKeepAwakeIndefinitely,
+            ),
+            if (controller.isKeepAwakeActive)
+              OutlinedButton(
+                onPressed: controller.cancelKeepAwakeSession,
+                child: Text(localizations.cancelKeepAwakeAction),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -289,6 +319,15 @@ class _ManualActions extends StatelessWidget {
               : localizations.aiDelayedLockIdleLabel,
           style: Theme.of(context).textTheme.bodySmall,
         ),
+        const SizedBox(height: 4),
+        Text(
+          keepAwakeStatusLabel(
+            localizations,
+            keepAwakeSession,
+            controller.keepAwakeRemaining,
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }
@@ -298,6 +337,26 @@ class _ManualActions extends StatelessWidget {
       return localizations.durationMinutesLabel(seconds ~/ 60);
     }
     return localizations.durationSecondsLabel(seconds);
+  }
+}
+
+class _KeepAwakeActionButton extends StatelessWidget {
+  const _KeepAwakeActionButton({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (selected) {
+      return FilledButton.tonal(onPressed: onPressed, child: Text(label));
+    }
+    return OutlinedButton(onPressed: onPressed, child: Text(label));
   }
 }
 
