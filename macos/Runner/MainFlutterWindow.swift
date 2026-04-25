@@ -395,7 +395,7 @@ class MainFlutterWindow: NSWindow {
   }
 
   deinit {
-    stopKeepAwake()
+    _ = stopKeepAwake()
     networkMonitor.cancel()
   }
 
@@ -458,7 +458,7 @@ class MainFlutterWindow: NSWindow {
         self.activateApp()
         result(nil)
       case "quitApp":
-        self.stopKeepAwake()
+        _ = self.stopKeepAwake()
         NSApp.terminate(nil)
         result(nil)
       case "setNativeLocale":
@@ -481,9 +481,10 @@ class MainFlutterWindow: NSWindow {
         self.startKeepAwake(arguments: call.arguments as? [String: Any], result: result)
       case "startKeepAwakeIndefinitely":
         self.startKeepAwakeIndefinitely(result: result)
+      case "getKeepAwakeState":
+        result(self.keepAwakeState())
       case "stopKeepAwake":
-        self.stopKeepAwake()
-        result(nil)
+        result(self.stopKeepAwake())
       case "showSuggestionPanel":
         self.handleSuggestionPanel(arguments: call.arguments as? [String: Any], isUpdate: false)
         result(nil)
@@ -528,7 +529,7 @@ class MainFlutterWindow: NSWindow {
   }
 
   private func beginKeepAwakeSession(durationSeconds: Int?, result: FlutterResult) {
-    stopKeepAwake()
+    _ = stopKeepAwake()
 
     do {
       try startKeepAwakeAssertions()
@@ -537,7 +538,7 @@ class MainFlutterWindow: NSWindow {
       }
       result(nil)
     } catch {
-      stopKeepAwake()
+      _ = stopKeepAwake()
       result(
         FlutterError(
           code: "keep_awake_start_failed",
@@ -584,20 +585,30 @@ class MainFlutterWindow: NSWindow {
     let timer = DispatchSource.makeTimerSource(queue: .main)
     timer.schedule(deadline: .now() + .seconds(durationSeconds))
     timer.setEventHandler { [weak self] in
-      self?.stopKeepAwake()
+      _ = self?.stopKeepAwake()
     }
     keepAwakeStopTimer = timer
     timer.resume()
   }
 
-  private func stopKeepAwake() {
+  private func keepAwakeState(releasedCount: Int = 0) -> [String: Any] {
+    [
+      "isActive": !keepAwakeAssertionIDs.isEmpty,
+      "assertionCount": keepAwakeAssertionIDs.count,
+      "releasedCount": releasedCount
+    ]
+  }
+
+  private func stopKeepAwake() -> [String: Any] {
     keepAwakeStopTimer?.cancel()
     keepAwakeStopTimer = nil
 
+    let releasedCount = keepAwakeAssertionIDs.count
     for assertionID in keepAwakeAssertionIDs {
       IOPMAssertionRelease(assertionID)
     }
     keepAwakeAssertionIDs.removeAll()
+    return keepAwakeState(releasedCount: releasedCount)
   }
 
   private func requestPermission() -> String {

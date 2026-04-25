@@ -363,6 +363,62 @@ void main() {
     });
   });
 
+  test(
+    'starting keep awake clears a native-only stale session first',
+    () async {
+      final platform = FakeLockbarPlatform()..keepAwakeNativeActive = true;
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => DateTime(2026, 4, 5, 13, 0),
+      );
+
+      await controller.initialize();
+      await controller.startKeepAwakeSession(const Duration(hours: 1));
+
+      expect(platform.getKeepAwakeStateCalls, 1);
+      expect(platform.stopKeepAwakeCalls, 1);
+      expect(platform.startKeepAwakeCalls, 1);
+      expect(platform.lastKeepAwakeDuration, const Duration(hours: 1));
+      expect(controller.keepAwakeSession?.preset, KeepAwakePreset.oneHour);
+      expect(platform.keepAwakeNativeActive, isTrue);
+    },
+  );
+
+  test('cancel keep awake stops a native-only stale session', () async {
+    final platform = FakeLockbarPlatform()..keepAwakeNativeActive = true;
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0),
+    );
+
+    await controller.initialize();
+    await controller.cancelKeepAwakeSession();
+
+    expect(platform.getKeepAwakeStateCalls, 1);
+    expect(platform.stopKeepAwakeCalls, 1);
+    expect(platform.keepAwakeNativeActive, isFalse);
+    expect(controller.keepAwakeSession, isNull);
+    expect(
+      statusMessageText(
+        localizationsForLocale(controller.effectiveLocale),
+        controller.statusMessage,
+      ),
+      'Keep-awake session stopped.',
+    );
+  });
+
   test('starting keep awake clears an existing delayed lock', () async {
     final platform = FakeLockbarPlatform();
     final controller = LockbarController(

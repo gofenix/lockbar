@@ -32,10 +32,12 @@ class FakeLockbarPlatform implements LockbarPlatform {
   int startKeepAwakeCalls = 0;
   int startKeepAwakeIndefinitelyCalls = 0;
   int stopKeepAwakeCalls = 0;
+  int getKeepAwakeStateCalls = 0;
   int showSuggestionPanelCalls = 0;
   int updateSuggestionPanelCalls = 0;
   int hideSuggestionPanelCalls = 0;
   bool keepAwakeStartSucceeds = true;
+  bool keepAwakeNativeActive = false;
   String? lastNativeLocaleTag;
   Duration? lastKeepAwakeDuration;
   PermissionState calendarPermissionState = PermissionState.notDetermined;
@@ -121,6 +123,7 @@ class FakeLockbarPlatform implements LockbarPlatform {
     if (!keepAwakeStartSucceeds) {
       throw Exception('startKeepAwake failed');
     }
+    keepAwakeNativeActive = true;
   }
 
   @override
@@ -130,11 +133,28 @@ class FakeLockbarPlatform implements LockbarPlatform {
     if (!keepAwakeStartSucceeds) {
       throw Exception('startKeepAwakeIndefinitely failed');
     }
+    keepAwakeNativeActive = true;
   }
 
   @override
-  Future<void> stopKeepAwake() async {
+  Future<KeepAwakePlatformState> getKeepAwakeState() async {
+    getKeepAwakeStateCalls += 1;
+    return KeepAwakePlatformState(
+      isActive: keepAwakeNativeActive,
+      assertionCount: keepAwakeNativeActive ? 2 : 0,
+    );
+  }
+
+  @override
+  Future<KeepAwakePlatformState> stopKeepAwake() async {
     stopKeepAwakeCalls += 1;
+    final wasActive = keepAwakeNativeActive;
+    keepAwakeNativeActive = false;
+    return KeepAwakePlatformState(
+      isActive: keepAwakeNativeActive,
+      assertionCount: 0,
+      releasedCount: wasActive ? 2 : 0,
+    );
   }
 
   @override

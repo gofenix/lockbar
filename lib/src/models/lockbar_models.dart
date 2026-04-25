@@ -95,6 +95,26 @@ class LockResult {
   final LockFailureCode? failureCode;
 }
 
+class KeepAwakePlatformState {
+  const KeepAwakePlatformState({
+    required this.isActive,
+    required this.assertionCount,
+    this.releasedCount = 0,
+  });
+
+  final bool isActive;
+  final int assertionCount;
+  final int releasedCount;
+
+  factory KeepAwakePlatformState.fromMap(Map<dynamic, dynamic>? map) {
+    return KeepAwakePlatformState(
+      isActive: map?['isActive'] as bool? ?? false,
+      assertionCount: map?['assertionCount'] as int? ?? 0,
+      releasedCount: map?['releasedCount'] as int? ?? 0,
+    );
+  }
+}
+
 class AppInfo {
   const AppInfo({
     required this.name,

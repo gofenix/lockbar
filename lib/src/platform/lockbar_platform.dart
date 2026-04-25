@@ -34,7 +34,9 @@ abstract class LockbarPlatform {
 
   Future<void> startKeepAwakeIndefinitely();
 
-  Future<void> stopKeepAwake();
+  Future<KeepAwakePlatformState> getKeepAwakeState();
+
+  Future<KeepAwakePlatformState> stopKeepAwake();
 
   Stream<SuggestionPanelAction> get suggestionPanelActions;
 
@@ -169,8 +171,19 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
   }
 
   @override
-  Future<void> stopKeepAwake() {
-    return _channel.invokeMethod<void>('stopKeepAwake');
+  Future<KeepAwakePlatformState> getKeepAwakeState() async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      'getKeepAwakeState',
+    );
+    return KeepAwakePlatformState.fromMap(result);
+  }
+
+  @override
+  Future<KeepAwakePlatformState> stopKeepAwake() async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      'stopKeepAwake',
+    );
+    return KeepAwakePlatformState.fromMap(result);
   }
 
   @override

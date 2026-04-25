@@ -727,7 +727,7 @@ class LockbarController extends ChangeNotifier {
   }
 
   Future<void> cancelKeepAwakeSession() async {
-    await _stopKeepAwakeSession();
+    await _stopKeepAwakeSession(forceNativeStop: true);
   }
 
   Future<void> acceptActiveSuggestionLockNow() async {
@@ -904,12 +904,27 @@ class LockbarController extends ChangeNotifier {
     _lastSystemContext = null;
   }
 
-  Future<void> _stopKeepAwakeSession({
+  Future<bool> _stopKeepAwakeSession({
     bool setStatus = true,
     bool recordAction = true,
+    bool forceNativeStop = false,
   }) async {
-    if (_keepAwakeSession == null) {
-      return;
+    final hadSession = _keepAwakeSession != null;
+    if (!hadSession && !forceNativeStop) {
+      return true;
+    }
+
+    if (!hadSession) {
+      try {
+        final nativeState = await platform.getKeepAwakeState();
+        if (!nativeState.isActive) {
+          return true;
+        }
+      } catch (_) {
+        _setErrorKey(StatusMessageKey.keepAwakeFailed);
+        notifyListeners();
+        return false;
+      }
     }
 
     _keepAwakeTimer?.cancel();
@@ -917,7 +932,19 @@ class LockbarController extends ChangeNotifier {
     _keepAwakeTimer = null;
     _keepAwakeTicker = null;
     _keepAwakeSession = null;
-    await platform.stopKeepAwake();
+    final KeepAwakePlatformState stopState;
+    try {
+      stopState = await platform.stopKeepAwake();
+    } catch (_) {
+      _setErrorKey(StatusMessageKey.keepAwakeFailed);
+      notifyListeners();
+      return false;
+    }
+    if (stopState.isActive) {
+      _setErrorKey(StatusMessageKey.keepAwakeFailed);
+      notifyListeners();
+      return false;
+    }
     if (recordAction) {
       await _recordAction('screen.awake.cancel');
     }
@@ -925,6 +952,7 @@ class LockbarController extends ChangeNotifier {
       _setStatusKey(StatusMessageKey.keepAwakeCancelled);
     }
     notifyListeners();
+    return true;
   }
 
   Future<void> _startKeepAwakeSession({
@@ -932,7 +960,14 @@ class LockbarController extends ChangeNotifier {
     Duration? duration,
     required StatusMessageKey statusKey,
   }) async {
-    await _stopKeepAwakeSession(setStatus: false, recordAction: false);
+    final stoppedExistingSession = await _stopKeepAwakeSession(
+      setStatus: false,
+      recordAction: false,
+      forceNativeStop: true,
+    );
+    if (!stoppedExistingSession) {
+      return;
+    }
 
     try {
       if (duration == null) {
