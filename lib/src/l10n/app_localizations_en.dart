@@ -702,6 +702,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Current: keep awake until stopped';
 
   @override
+  String get trayTitleReady => 'Ready';
+
+  @override
+  String trayTitleFocus(Object duration) {
+    return 'Focus $duration';
+  }
+
+  @override
+  String trayTitleKeepAwake(Object duration) {
+    return 'Awake $duration';
+  }
+
+  @override
+  String get trayTitleKeepAwakeIndefinitely => 'Awake';
+
+  @override
   String get aiHeadlineFocusEnded => 'Focus block complete.';
 
   @override
@@ -897,7 +913,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String aiFocusRunningCountdownLabel(Object duration) {
+    return 'Focus session active: $duration remaining';
+  }
+
+  @override
   String get aiFocusIdleLabel => 'No focus session is running.';
+
+  @override
+  String focusMenuStatusRunningLabel(Object duration) {
+    return 'Current: focus, $duration remaining';
+  }
 
   @override
   String aiDelayedLockRunningLabel(Object duration) {

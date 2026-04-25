@@ -5,12 +5,18 @@ import CoreWLAN
 import EventKit
 import FlutterMacOS
 import IOBluetooth
+import IOKit.pwr_mgt
 import LaunchAtLogin
 import Network
 
 private let lockbarChannelName = "lockbar/macos"
 private let lockbarPermissionRequestKey = "lockbar.hasRequestedPermission"
 private let suggestionPanelWidth: CGFloat = 420
+private let keepAwakeReason = "LockBar keep-awake" as CFString
+
+private enum KeepAwakeAssertionError: Error {
+  case creationFailed(type: String, code: IOReturn)
+}
 
 private final class SuggestionPanel: NSPanel {
   override var canBecomeKey: Bool { true }
@@ -365,7 +371,8 @@ class MainFlutterWindow: NSWindow {
   private let networkMonitorQueue = DispatchQueue(label: "lockbar.network-monitor")
   private var networkReachable = false
   private var platformChannel: FlutterMethodChannel?
-  private var keepAwakeProcess: Process?
+  private var keepAwakeAssertionIDs: [IOPMAssertionID] = []
+  private var keepAwakeStopTimer: DispatchSourceTimer?
   private lazy var suggestionPanelController = SuggestionPanelController {
     [weak self] action in
     self?.emitSuggestionPanelAction(action)
@@ -513,76 +520,84 @@ class MainFlutterWindow: NSWindow {
       return
     }
 
-    stopKeepAwake()
-
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-    process.arguments = ["-d", "-i", "-t", String(rawDuration)]
-    process.terminationHandler = { [weak self, weak process] _ in
-      DispatchQueue.main.async {
-        guard let self, let process else { return }
-        if self.keepAwakeProcess === process {
-          self.keepAwakeProcess = nil
-        }
-      }
-    }
-
-    do {
-      try process.run()
-      keepAwakeProcess = process
-      result(nil)
-    } catch {
-      keepAwakeProcess = nil
-      result(
-        FlutterError(
-          code: "keep_awake_start_failed",
-          message: "Failed to start caffeinate.",
-          details: error.localizedDescription
-        )
-      )
-    }
+    beginKeepAwakeSession(durationSeconds: rawDuration, result: result)
   }
 
   private func startKeepAwakeIndefinitely(result: FlutterResult) {
+    beginKeepAwakeSession(durationSeconds: nil, result: result)
+  }
+
+  private func beginKeepAwakeSession(durationSeconds: Int?, result: FlutterResult) {
     stopKeepAwake()
 
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-    process.arguments = ["-d", "-i"]
-    process.terminationHandler = { [weak self, weak process] _ in
-      DispatchQueue.main.async {
-        guard let self, let process else { return }
-        if self.keepAwakeProcess === process {
-          self.keepAwakeProcess = nil
-        }
-      }
-    }
-
     do {
-      try process.run()
-      keepAwakeProcess = process
+      try startKeepAwakeAssertions()
+      if let durationSeconds {
+        scheduleKeepAwakeStop(after: durationSeconds)
+      }
       result(nil)
     } catch {
-      keepAwakeProcess = nil
+      stopKeepAwake()
       result(
         FlutterError(
           code: "keep_awake_start_failed",
-          message: "Failed to start caffeinate.",
-          details: error.localizedDescription
+          message: "Failed to start keep-awake assertions.",
+          details: String(describing: error)
         )
       )
     }
   }
 
-  private func stopKeepAwake() {
-    guard let process = keepAwakeProcess else {
-      return
+  private func startKeepAwakeAssertions() throws {
+    var assertionIDs: [IOPMAssertionID] = []
+    do {
+      assertionIDs.append(
+        try createKeepAwakeAssertion(type: kIOPMAssertionTypeNoDisplaySleep)
+      )
+      assertionIDs.append(
+        try createKeepAwakeAssertion(type: kIOPMAssertionTypeNoIdleSleep)
+      )
+      keepAwakeAssertionIDs = assertionIDs
+    } catch {
+      for assertionID in assertionIDs {
+        IOPMAssertionRelease(assertionID)
+      }
+      throw error
     }
+  }
 
-    keepAwakeProcess = nil
-    if process.isRunning {
-      process.terminate()
+  private func createKeepAwakeAssertion(type: String) throws -> IOPMAssertionID {
+    var assertionID = IOPMAssertionID(kIOPMNullAssertionID)
+    let status = IOPMAssertionCreateWithName(
+      type as CFString,
+      IOPMAssertionLevel(kIOPMAssertionLevelOn),
+      keepAwakeReason,
+      &assertionID
+    )
+    guard status == kIOReturnSuccess else {
+      throw KeepAwakeAssertionError.creationFailed(type: type, code: status)
     }
+    return assertionID
+  }
+
+  private func scheduleKeepAwakeStop(after durationSeconds: Int) {
+    let timer = DispatchSource.makeTimerSource(queue: .main)
+    timer.schedule(deadline: .now() + .seconds(durationSeconds))
+    timer.setEventHandler { [weak self] in
+      self?.stopKeepAwake()
+    }
+    keepAwakeStopTimer = timer
+    timer.resume()
+  }
+
+  private func stopKeepAwake() {
+    keepAwakeStopTimer?.cancel()
+    keepAwakeStopTimer = nil
+
+    for assertionID in keepAwakeAssertionIDs {
+      IOPMAssertionRelease(assertionID)
+    }
+    keepAwakeAssertionIDs.removeAll()
   }
 
   private func requestPermission() -> String {

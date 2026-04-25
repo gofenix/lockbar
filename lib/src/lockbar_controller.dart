@@ -94,6 +94,7 @@ class LockbarController extends ChangeNotifier {
   final Map<AiTriggerType, DateTime> _lastTriggerTimes = {};
   DateTime? _lastEveningSuggestionDay;
   Timer? _focusTimer;
+  Timer? _focusTicker;
   Timer? _delayedLockTimer;
   Timer? _keepAwakeTimer;
   Timer? _keepAwakeTicker;
@@ -139,20 +140,11 @@ class LockbarController extends ChangeNotifier {
   String get aiModelLabel =>
       _savedAiConnection?.model ?? aiInferenceClient.model;
   FocusSessionState? get focusSession => _focusSession;
+  Duration? get focusRemaining => _remainingUntil(_focusSession?.endsAt);
   DelayedLockState? get delayedLock => _delayedLock;
   KeepAwakeSessionState? get keepAwakeSession => _keepAwakeSession;
-  Duration? get keepAwakeRemaining {
-    final endsAt = _keepAwakeSession?.endsAt;
-    if (endsAt == null) {
-      return null;
-    }
-
-    final remaining = endsAt.difference(_now());
-    if (remaining.isNegative) {
-      return Duration.zero;
-    }
-    return remaining;
-  }
+  Duration? get keepAwakeRemaining =>
+      _remainingUntil(_keepAwakeSession?.endsAt);
 
   bool get isKeepAwakeActive => _keepAwakeSession != null;
   bool get isKeepAwakeIndefinite => _keepAwakeSession?.isIndefinite ?? false;
@@ -651,6 +643,7 @@ class LockbarController extends ChangeNotifier {
 
   Future<void> startFocusSession(Duration duration) async {
     _focusTimer?.cancel();
+    _focusTicker?.cancel();
     final now = _now();
     _focusSession = FocusSessionState(
       startedAt: now,
@@ -660,6 +653,14 @@ class LockbarController extends ChangeNotifier {
     _focusTimer = Timer(duration, () {
       unawaited(_onFocusSessionFinished());
     });
+    _focusTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_focusSession == null) {
+        _focusTicker?.cancel();
+        _focusTicker = null;
+        return;
+      }
+      notifyListeners();
+    });
     await _recordAction('focus.start.${duration.inMinutes}m');
     _setStatusKey(StatusMessageKey.focusSessionStarted);
     notifyListeners();
@@ -667,6 +668,9 @@ class LockbarController extends ChangeNotifier {
 
   Future<void> cancelFocusSession() async {
     _focusTimer?.cancel();
+    _focusTicker?.cancel();
+    _focusTimer = null;
+    _focusTicker = null;
     _focusSession = null;
     await _recordAction('focus.cancel');
     _setStatusKey(StatusMessageKey.focusSessionCancelled);
@@ -817,6 +821,7 @@ class LockbarController extends ChangeNotifier {
   @override
   void dispose() {
     _focusTimer?.cancel();
+    _focusTicker?.cancel();
     _delayedLockTimer?.cancel();
     _keepAwakeTimer?.cancel();
     _keepAwakeTicker?.cancel();
@@ -1038,6 +1043,10 @@ class LockbarController extends ChangeNotifier {
   Future<void> _onFocusSessionFinished() async {
     final session = _focusSession;
     _focusSession = null;
+    _focusTimer?.cancel();
+    _focusTicker?.cancel();
+    _focusTimer = null;
+    _focusTicker = null;
     notifyListeners();
     if (session == null) {
       return;
@@ -1084,6 +1093,18 @@ class LockbarController extends ChangeNotifier {
       KeepAwakePreset.twoHours => '120m',
       KeepAwakePreset.indefinite => 'forever',
     };
+  }
+
+  Duration? _remainingUntil(DateTime? endsAt) {
+    if (endsAt == null) {
+      return null;
+    }
+
+    final remaining = endsAt.difference(_now());
+    if (remaining.isNegative) {
+      return Duration.zero;
+    }
+    return remaining;
   }
 
   Future<void> _evaluateAiTrigger(

@@ -274,6 +274,20 @@
     }
   },
   "keepAwakeMenuStatusIndefinitelyLabel": "Current: keep awake until stopped",
+  "trayTitleReady": "Ready",
+  "trayTitleFocus": "Focus {duration}",
+  "@trayTitleFocus": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "trayTitleKeepAwake": "Awake {duration}",
+  "@trayTitleKeepAwake": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "trayTitleKeepAwakeIndefinitely": "Awake",
   "aiHeadlineFocusEnded": "Focus block complete.",
   "aiReasonFocusEndedFresh": "You just closed a focus block. If you are stepping away, this is the cleanest moment to lock.",
   "aiReasonFocusEndedBuffer": "You usually leave yourself a small buffer after deep work. Lock now if you're done, or take the short runway again.",
@@ -351,7 +365,19 @@
       "minutes": {}
     }
   },
+  "aiFocusRunningCountdownLabel": "Focus session active: {duration} remaining",
+  "@aiFocusRunningCountdownLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "aiFocusIdleLabel": "No focus session is running.",
+  "focusMenuStatusRunningLabel": "Current: focus, {duration} remaining",
+  "@focusMenuStatusRunningLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "aiDelayedLockRunningLabel": "Delayed lock queued: {duration}",
   "@aiDelayedLockRunningLabel": {
     "placeholders": {

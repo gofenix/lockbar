@@ -666,6 +666,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keepAwakeMenuStatusIndefinitelyLabel => '当前：一直保持亮屏';
 
   @override
+  String get trayTitleReady => '就绪';
+
+  @override
+  String trayTitleFocus(Object duration) {
+    return '专注 $duration';
+  }
+
+  @override
+  String trayTitleKeepAwake(Object duration) {
+    return '亮屏 $duration';
+  }
+
+  @override
+  String get trayTitleKeepAwakeIndefinitely => '亮屏中';
+
+  @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';
 
   @override
@@ -853,7 +869,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String aiFocusRunningCountdownLabel(Object duration) {
+    return '专注 session 进行中：剩余 $duration';
+  }
+
+  @override
   String get aiFocusIdleLabel => '当前没有正在进行的专注 session。';
+
+  @override
+  String focusMenuStatusRunningLabel(Object duration) {
+    return '当前：专注，剩余 $duration';
+  }
 
   @override
   String aiDelayedLockRunningLabel(Object duration) {
@@ -1544,6 +1570,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get keepAwakeMenuStatusIndefinitelyLabel => '当前：一直保持亮屏';
 
   @override
+  String get trayTitleReady => '就绪';
+
+  @override
+  String trayTitleFocus(Object duration) {
+    return '专注 $duration';
+  }
+
+  @override
+  String trayTitleKeepAwake(Object duration) {
+    return '亮屏 $duration';
+  }
+
+  @override
+  String get trayTitleKeepAwakeIndefinitely => '亮屏中';
+
+  @override
   String get aiHeadlineFocusEnded => '这一段专注结束了。';
 
   @override
@@ -1731,7 +1773,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String aiFocusRunningCountdownLabel(Object duration) {
+    return '专注 session 进行中：剩余 $duration';
+  }
+
+  @override
   String get aiFocusIdleLabel => '当前没有正在进行的专注 session。';
+
+  @override
+  String focusMenuStatusRunningLabel(Object duration) {
+    return '当前：专注，剩余 $duration';
+  }
 
   @override
   String aiDelayedLockRunningLabel(Object duration) {

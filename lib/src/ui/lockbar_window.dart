@@ -305,9 +305,11 @@ class _ManualActions extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          focusSession != null
-              ? localizations.aiFocusRunningLabel(focusSession.durationMinutes)
-              : localizations.aiFocusIdleLabel,
+          focusStatusLabel(
+            localizations,
+            focusSession,
+            controller.focusRemaining,
+          ),
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 4),

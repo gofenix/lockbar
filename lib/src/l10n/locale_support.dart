@@ -163,6 +163,72 @@ String formatClockDuration(Duration duration) {
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
+String trayTitle(
+  AppLocalizations localizations, {
+  required FocusSessionState? focusSession,
+  required Duration? focusRemaining,
+  required KeepAwakeSessionState? keepAwakeSession,
+  required Duration? keepAwakeRemaining,
+}) {
+  final finiteKeepAwakeSession =
+      (keepAwakeSession == null || keepAwakeSession.isIndefinite)
+      ? null
+      : keepAwakeSession;
+
+  if (focusSession != null && finiteKeepAwakeSession != null) {
+    final keepAwakeEndsAt = finiteKeepAwakeSession.endsAt!;
+    if (focusSession.endsAt.isBefore(keepAwakeEndsAt) ||
+        focusSession.endsAt.isAtSameMomentAs(keepAwakeEndsAt)) {
+      return localizations.trayTitleFocus(
+        formatClockDuration(focusRemaining ?? Duration.zero),
+      );
+    }
+    return localizations.trayTitleKeepAwake(
+      formatClockDuration(keepAwakeRemaining ?? Duration.zero),
+    );
+  }
+
+  if (focusSession != null) {
+    return localizations.trayTitleFocus(
+      formatClockDuration(focusRemaining ?? Duration.zero),
+    );
+  }
+
+  if (finiteKeepAwakeSession != null) {
+    return localizations.trayTitleKeepAwake(
+      formatClockDuration(keepAwakeRemaining ?? Duration.zero),
+    );
+  }
+
+  if (keepAwakeSession?.isIndefinite ?? false) {
+    return localizations.trayTitleKeepAwakeIndefinitely;
+  }
+
+  return localizations.trayTitleReady;
+}
+
+String focusStatusLabel(
+  AppLocalizations localizations,
+  FocusSessionState? session,
+  Duration? remaining,
+) {
+  if (session == null) {
+    return localizations.aiFocusIdleLabel;
+  }
+  return localizations.aiFocusRunningCountdownLabel(
+    formatClockDuration(remaining ?? Duration.zero),
+  );
+}
+
+String focusMenuStatusLabel(
+  AppLocalizations localizations,
+  Duration? remaining,
+) {
+  return localizations.focusMenuStatusRunningLabel(
+    formatClockDuration(remaining ?? Duration.zero),
+  );
+}
+
 String keepAwakeStatusLabel(
   AppLocalizations localizations,
   KeepAwakeSessionState? session,

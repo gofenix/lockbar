@@ -1,3 +1,4 @@
+import 'package:lockbar/src/desktop_coordinator.dart';
 import 'package:lockbar/src/models/ai_models.dart';
 import 'package:lockbar/src/models/lockbar_models.dart';
 import 'package:lockbar/src/platform/lockbar_platform.dart';
@@ -7,6 +8,7 @@ import 'package:lockbar/src/services/ai_memory_service.dart';
 import 'package:lockbar/src/services/ai_trace_store.dart';
 import 'package:lockbar/src/services/launch_at_startup_service.dart';
 import 'package:lockbar/src/services/locale_preferences_service.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -171,6 +173,64 @@ class FakeLaunchAtStartupService implements LaunchAtStartupService {
   Future<void> setEnabled(bool enabled) async {
     setEnabledCalls += 1;
     this.enabled = enabled;
+  }
+}
+
+class FakeTrayClient implements LockbarTrayClient {
+  final List<TrayListener> listeners = [];
+  String? iconPath;
+  int? iconSize;
+  bool? isTemplate;
+  String? toolTip;
+  String? title;
+  Menu? contextMenu;
+  int destroyCalls = 0;
+  int popUpContextMenuCalls = 0;
+
+  @override
+  void addListener(TrayListener listener) {
+    listeners.add(listener);
+  }
+
+  @override
+  void removeListener(TrayListener listener) {
+    listeners.remove(listener);
+  }
+
+  @override
+  Future<void> destroy() async {
+    destroyCalls += 1;
+  }
+
+  @override
+  Future<void> popUpContextMenu() async {
+    popUpContextMenuCalls += 1;
+  }
+
+  @override
+  Future<void> setContextMenu(Menu menu) async {
+    contextMenu = menu;
+  }
+
+  @override
+  Future<void> setIcon(
+    String path, {
+    required int iconSize,
+    required bool isTemplate,
+  }) async {
+    iconPath = path;
+    this.iconSize = iconSize;
+    this.isTemplate = isTemplate;
+  }
+
+  @override
+  Future<void> setTitle(String title) async {
+    this.title = title;
+  }
+
+  @override
+  Future<void> setToolTip(String toolTip) async {
+    this.toolTip = toolTip;
   }
 }
 

@@ -8,6 +8,7 @@ import 'test_doubles.dart';
 
 void main() {
   test('keep awake submenu shows active status and checked preset', () async {
+    final trayClient = FakeTrayClient();
     final controller = LockbarController(
       platform: FakeLockbarPlatform(),
       launchAtStartupService: FakeLaunchAtStartupService(),
@@ -21,6 +22,7 @@ void main() {
     final coordinator = LockbarDesktopCoordinator(
       controller: controller,
       platform: controller.platform,
+      trayClient: trayClient,
     );
 
     await controller.initialize();
@@ -44,6 +46,7 @@ void main() {
   test(
     'keep awake submenu hides active controls when no session is running',
     () async {
+      final trayClient = FakeTrayClient();
       final controller = LockbarController(
         platform: FakeLockbarPlatform(),
         launchAtStartupService: FakeLaunchAtStartupService(),
@@ -56,6 +59,7 @@ void main() {
       final coordinator = LockbarDesktopCoordinator(
         controller: controller,
         platform: controller.platform,
+        trayClient: trayClient,
       );
 
       await controller.initialize();
@@ -75,6 +79,7 @@ void main() {
   test(
     'indefinite keep awake menu shows indefinite status and checked preset',
     () async {
+      final trayClient = FakeTrayClient();
       final controller = LockbarController(
         platform: FakeLockbarPlatform(),
         launchAtStartupService: FakeLaunchAtStartupService(),
@@ -88,6 +93,7 @@ void main() {
       final coordinator = LockbarDesktopCoordinator(
         controller: controller,
         platform: controller.platform,
+        trayClient: trayClient,
       );
 
       await controller.initialize();
@@ -106,4 +112,142 @@ void main() {
       expect(menu.getMenuItem('cancelKeepAwake'), isNotNull);
     },
   );
+
+  test(
+    'focus menu shows live status and tray title uses focus countdown',
+    () async {
+      final trayClient = FakeTrayClient();
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => DateTime(2026, 4, 5, 13, 0, 0),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+      await controller.startFocusSession(const Duration(minutes: 25));
+      await coordinator.syncTrayTitleForTesting(force: true);
+
+      final menu = coordinator.buildContextMenu();
+
+      expect(menu.items!.first.label, 'Current: focus, 25:00 remaining');
+      expect(menu.items!.first.disabled, isTrue);
+      expect(menu.getMenuItem('cancelFocus'), isNotNull);
+      expect(trayClient.title, 'Focus 25:00');
+    },
+  );
+
+  test('tray title prefers the earlier finite session', () async {
+    final trayClient = FakeTrayClient();
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform(),
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+    await controller.startFocusSession(const Duration(minutes: 50));
+    await controller.startKeepAwakeSession(const Duration(minutes: 30));
+    await coordinator.syncTrayTitleForTesting(force: true);
+
+    expect(trayClient.title, 'Awake 30:00');
+  });
+
+  test('tray title prefers focus when finite sessions end together', () async {
+    final trayClient = FakeTrayClient();
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform(),
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+    await controller.startFocusSession(const Duration(minutes: 30));
+    await controller.startKeepAwakeSession(const Duration(minutes: 30));
+    await coordinator.syncTrayTitleForTesting(force: true);
+
+    expect(trayClient.title, 'Focus 30:00');
+  });
+
+  test('tray title falls back to awake and ready states', () async {
+    final trayClient = FakeTrayClient();
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform(),
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+
+    await coordinator.syncTrayTitleForTesting(force: true);
+    expect(trayClient.title, 'Ready');
+
+    await controller.startKeepAwakeIndefinitely();
+    await coordinator.syncTrayTitleForTesting(force: true);
+    expect(trayClient.title, 'Awake');
+  });
+
+  test('tray title localizes to Chinese', () async {
+    final trayClient = FakeTrayClient();
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform(),
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('zh'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+    await controller.startFocusSession(const Duration(minutes: 25));
+    await coordinator.syncTrayTitleForTesting(force: true);
+
+    expect(trayClient.title, '专注 25:00');
+  });
 }

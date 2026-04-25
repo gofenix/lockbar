@@ -213,6 +213,35 @@ void main() {
     expect(find.text('Keep-awake active: 29:59'), findsOneWidget);
   });
 
+  testWidgets('settings window shows focus countdown live', (
+    WidgetTester tester,
+  ) async {
+    var now = DateTime(2026, 4, 5, 13, 0, 0);
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform()..permissionState = PermissionState.denied,
+      launchAtStartupService: FakeLaunchAtStartupService()..enabled = true,
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => now,
+    );
+
+    await tester.pumpWidget(LockbarApp(controller: controller));
+    await tester.pumpAndSettle();
+    await controller.startFocusSession(const Duration(minutes: 25));
+    await tester.pump();
+
+    expect(find.text('Cancel Focus'), findsOneWidget);
+    expect(find.text('Focus session active: 25:00 remaining'), findsOneWidget);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Focus session active: 24:59 remaining'), findsOneWidget);
+  });
+
   testWidgets('settings window shows indefinite and idle keep-awake states', (
     WidgetTester tester,
   ) async {

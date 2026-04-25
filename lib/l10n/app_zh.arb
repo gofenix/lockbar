@@ -274,6 +274,20 @@
     }
   },
   "keepAwakeMenuStatusIndefinitelyLabel": "当前：一直保持亮屏",
+  "trayTitleReady": "就绪",
+  "trayTitleFocus": "专注 {duration}",
+  "@trayTitleFocus": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "trayTitleKeepAwake": "亮屏 {duration}",
+  "@trayTitleKeepAwake": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "trayTitleKeepAwakeIndefinitely": "亮屏中",
   "aiHeadlineFocusEnded": "这一段专注结束了。",
   "aiReasonFocusEndedFresh": "你刚完成一段专注。如果现在准备离开，这就是最干净的锁屏时机。",
   "aiReasonFocusEndedBuffer": "你平时常会在深度工作后留一个小缓冲。现在可以直接锁，也可以再给自己一点收尾时间。",
@@ -351,7 +365,19 @@
       "minutes": {}
     }
   },
+  "aiFocusRunningCountdownLabel": "专注 session 进行中：剩余 {duration}",
+  "@aiFocusRunningCountdownLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "aiFocusIdleLabel": "当前没有正在进行的专注 session。",
+  "focusMenuStatusRunningLabel": "当前：专注，剩余 {duration}",
+  "@focusMenuStatusRunningLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "aiDelayedLockRunningLabel": "延时锁屏已排队：{duration}",
   "@aiDelayedLockRunningLabel": {
     "placeholders": {

@@ -1317,6 +1317,30 @@ abstract class AppLocalizations {
   /// **'Current: keep awake until stopped'**
   String get keepAwakeMenuStatusIndefinitelyLabel;
 
+  /// No description provided for @trayTitleReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get trayTitleReady;
+
+  /// No description provided for @trayTitleFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus {duration}'**
+  String trayTitleFocus(Object duration);
+
+  /// No description provided for @trayTitleKeepAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Awake {duration}'**
+  String trayTitleKeepAwake(Object duration);
+
+  /// No description provided for @trayTitleKeepAwakeIndefinitely.
+  ///
+  /// In en, this message translates to:
+  /// **'Awake'**
+  String get trayTitleKeepAwakeIndefinitely;
+
   /// No description provided for @aiHeadlineFocusEnded.
   ///
   /// In en, this message translates to:
@@ -1659,11 +1683,23 @@ abstract class AppLocalizations {
   /// **'Focus session running: {minutes} min'**
   String aiFocusRunningLabel(Object minutes);
 
+  /// No description provided for @aiFocusRunningCountdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus session active: {duration} remaining'**
+  String aiFocusRunningCountdownLabel(Object duration);
+
   /// No description provided for @aiFocusIdleLabel.
   ///
   /// In en, this message translates to:
   /// **'No focus session is running.'**
   String get aiFocusIdleLabel;
+
+  /// No description provided for @focusMenuStatusRunningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: focus, {duration} remaining'**
+  String focusMenuStatusRunningLabel(Object duration);
 
   /// No description provided for @aiDelayedLockRunningLabel.
   ///

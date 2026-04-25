@@ -171,6 +171,103 @@ void main() {
     );
   });
 
+  test('focus session ticks down and exposes remaining time', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+      controller.startFocusSession(const Duration(minutes: 25));
+      async.flushMicrotasks();
+
+      var listenerCalls = 0;
+      controller.addListener(() {
+        listenerCalls += 1;
+      });
+
+      expect(controller.focusRemaining, const Duration(minutes: 25));
+
+      now = now.add(const Duration(seconds: 1));
+      async.elapse(const Duration(seconds: 1));
+      async.flushMicrotasks();
+
+      expect(listenerCalls, greaterThan(0));
+      expect(
+        controller.focusRemaining,
+        const Duration(minutes: 24, seconds: 59),
+      );
+    });
+  });
+
+  test('cancelling focus clears the countdown state', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+      controller.startFocusSession(const Duration(minutes: 25));
+      async.flushMicrotasks();
+
+      controller.cancelFocusSession();
+      async.flushMicrotasks();
+
+      now = now.add(const Duration(seconds: 5));
+      async.elapse(const Duration(seconds: 5));
+      async.flushMicrotasks();
+
+      expect(controller.focusSession, isNull);
+      expect(controller.focusRemaining, isNull);
+    });
+  });
+
+  test('focus session expires and clears its countdown state', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+      controller.startFocusSession(const Duration(minutes: 25));
+      async.flushMicrotasks();
+
+      now = now.add(const Duration(minutes: 25));
+      async.elapse(const Duration(minutes: 25));
+      async.flushMicrotasks();
+
+      expect(controller.focusSession, isNull);
+      expect(controller.focusRemaining, isNull);
+    });
+  });
+
   test('keep awake session starts for one hour and can be cancelled', () async {
     final platform = FakeLockbarPlatform();
     final controller = LockbarController(
@@ -210,6 +307,60 @@ void main() {
       ),
       'Keep-awake session stopped.',
     );
+  });
+
+  test('starting keep awake again replaces the active duration', () {
+    fakeAsync((async) {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final platform = FakeLockbarPlatform();
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+
+      controller.initialize();
+      async.flushMicrotasks();
+
+      controller.startKeepAwakeSession(const Duration(minutes: 30));
+      async.flushMicrotasks();
+      expect(platform.startKeepAwakeCalls, 1);
+      expect(platform.stopKeepAwakeCalls, 0);
+      expect(platform.lastKeepAwakeDuration, const Duration(minutes: 30));
+
+      now = now.add(const Duration(minutes: 10));
+      async.elapse(const Duration(minutes: 10));
+      async.flushMicrotasks();
+
+      controller.startKeepAwakeSession(const Duration(hours: 1));
+      async.flushMicrotasks();
+
+      expect(platform.stopKeepAwakeCalls, 1);
+      expect(platform.startKeepAwakeCalls, 2);
+      expect(platform.lastKeepAwakeDuration, const Duration(hours: 1));
+      expect(controller.keepAwakeSession?.preset, KeepAwakePreset.oneHour);
+      expect(controller.keepAwakeRemaining, const Duration(hours: 1));
+
+      now = now.add(const Duration(minutes: 20));
+      async.elapse(const Duration(minutes: 20));
+      async.flushMicrotasks();
+
+      expect(controller.keepAwakeSession, isNotNull);
+      expect(controller.keepAwakeRemaining, const Duration(minutes: 40));
+      expect(platform.stopKeepAwakeCalls, 1);
+
+      now = now.add(const Duration(minutes: 40));
+      async.elapse(const Duration(minutes: 40));
+      async.flushMicrotasks();
+
+      expect(controller.keepAwakeSession, isNull);
+      expect(platform.stopKeepAwakeCalls, 2);
+    });
   });
 
   test('starting keep awake clears an existing delayed lock', () async {

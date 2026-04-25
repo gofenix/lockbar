@@ -11,15 +11,91 @@ import 'models/ai_models.dart';
 import 'models/lockbar_models.dart';
 import 'platform/lockbar_platform.dart';
 
+abstract class LockbarTrayClient {
+  void addListener(TrayListener listener);
+
+  void removeListener(TrayListener listener);
+
+  Future<void> destroy();
+
+  Future<void> setContextMenu(Menu menu);
+
+  Future<void> setIcon(
+    String path, {
+    required int iconSize,
+    required bool isTemplate,
+  });
+
+  Future<void> setTitle(String title);
+
+  Future<void> setToolTip(String toolTip);
+
+  Future<void> popUpContextMenu();
+}
+
+class SystemLockbarTrayClient implements LockbarTrayClient {
+  const SystemLockbarTrayClient();
+
+  @override
+  void addListener(TrayListener listener) {
+    trayManager.addListener(listener);
+  }
+
+  @override
+  void removeListener(TrayListener listener) {
+    trayManager.removeListener(listener);
+  }
+
+  @override
+  Future<void> destroy() async {
+    await trayManager.destroy();
+  }
+
+  @override
+  Future<void> setContextMenu(Menu menu) async {
+    await trayManager.setContextMenu(menu);
+  }
+
+  @override
+  Future<void> setIcon(
+    String path, {
+    required int iconSize,
+    required bool isTemplate,
+  }) async {
+    await trayManager.setIcon(path, iconSize: iconSize, isTemplate: isTemplate);
+  }
+
+  @override
+  Future<void> setTitle(String title) async {
+    await trayManager.setTitle(title);
+  }
+
+  @override
+  Future<void> setToolTip(String toolTip) async {
+    await trayManager.setToolTip(toolTip);
+  }
+
+  @override
+  Future<void> popUpContextMenu() async {
+    await trayManager.popUpContextMenu();
+  }
+}
+
 class LockbarDesktopCoordinator with TrayListener, WindowListener {
-  LockbarDesktopCoordinator({required this.controller, required this.platform});
+  LockbarDesktopCoordinator({
+    required this.controller,
+    required this.platform,
+    LockbarTrayClient? trayClient,
+  }) : trayClient = trayClient ?? const SystemLockbarTrayClient();
 
   final LockbarController controller;
   final LockbarPlatform platform;
+  final LockbarTrayClient trayClient;
 
   bool _started = false;
   bool _didPrepareSettingsWindow = false;
   String? _lastSyncedLocaleTag;
+  String? _lastTrayTitle;
   bool? _lastSettingsVisible;
   bool? _lastSuggestionPanelVisible;
   String? _lastSuggestionPanelSignature;
@@ -36,7 +112,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     _started = true;
 
     controller.addListener(_handleControllerChanged);
-    trayManager.addListener(this);
+    trayClient.addListener(this);
     windowManager.addListener(this);
     _panelActionsSubscription = platform.suggestionPanelActions.listen(
       _handleSuggestionPanelAction,
@@ -44,6 +120,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
 
     await _configureTray();
     await _syncContextMenu();
+    await _syncTrayTitle(force: true);
     await _syncNativeLocale();
     await _syncTrayIconAppearance(force: true);
     await _syncSettingsWindow(force: true);
@@ -56,13 +133,13 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     }
     _panelActionsSubscription?.cancel();
     controller.removeListener(_handleControllerChanged);
-    trayManager.removeListener(this);
+    trayClient.removeListener(this);
     windowManager.removeListener(this);
   }
 
   Future<void> _configureTray() async {
     await _applyTrayIcon(controller.hasSuggestionIndicator);
-    await trayManager.setToolTip('LockBar');
+    await trayClient.setToolTip('LockBar');
   }
 
   String _trayIconAsset(bool attention) {
@@ -72,7 +149,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _applyTrayIcon(bool attention) async {
-    await trayManager.setIcon(
+    await trayClient.setIcon(
       _trayIconAsset(attention),
       iconSize: 19,
       isTemplate: !attention,
@@ -89,7 +166,16 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _syncContextMenu() async {
-    await trayManager.setContextMenu(buildContextMenu());
+    await trayClient.setContextMenu(buildContextMenu());
+  }
+
+  Future<void> _syncTrayTitle({bool force = false}) async {
+    final nextTitle = buildTrayTitle();
+    if (!force && _lastTrayTitle == nextTitle) {
+      return;
+    }
+    _lastTrayTitle = nextTitle;
+    await trayClient.setTitle(nextTitle);
   }
 
   @visibleForTesting
@@ -145,6 +231,12 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
         ),
       );
     } else {
+      items.add(
+        MenuItem(
+          label: focusMenuStatusLabel(localizations, controller.focusRemaining),
+          disabled: true,
+        ),
+      );
       items.add(
         MenuItem(
           key: _MenuAction.cancelFocus.name,
@@ -271,11 +363,29 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     return Menu(items: items);
   }
 
+  @visibleForTesting
+  String buildTrayTitle() {
+    final localizations = localizationsForLocale(controller.effectiveLocale);
+    return trayTitle(
+      localizations,
+      focusSession: controller.focusSession,
+      focusRemaining: controller.focusRemaining,
+      keepAwakeSession: controller.keepAwakeSession,
+      keepAwakeRemaining: controller.keepAwakeRemaining,
+    );
+  }
+
+  @visibleForTesting
+  Future<void> syncTrayTitleForTesting({bool force = false}) async {
+    await _syncTrayTitle(force: force);
+  }
+
   Future<void> _handleControllerChanged() async {
     if (!_started) {
       return;
     }
     await _syncContextMenu();
+    await _syncTrayTitle();
     await _syncNativeLocale();
     await _syncTrayIconAppearance();
     await _syncSettingsWindow();
@@ -393,7 +503,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    unawaited(trayManager.popUpContextMenu());
+    unawaited(trayClient.popUpContextMenu());
   }
 
   @override
@@ -487,7 +597,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _quitApp() async {
-    await trayManager.destroy();
+    await trayClient.destroy();
     await platform.quitApp();
   }
 }
