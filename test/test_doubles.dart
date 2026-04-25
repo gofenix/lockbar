@@ -204,6 +204,7 @@ class FakeTrayClient implements LockbarTrayClient {
   String? toolTip;
   String? title;
   Menu? contextMenu;
+  int setContextMenuCalls = 0;
   int destroyCalls = 0;
   int popUpContextMenuCalls = 0;
 
@@ -229,6 +230,7 @@ class FakeTrayClient implements LockbarTrayClient {
 
   @override
   Future<void> setContextMenu(Menu menu) async {
+    setContextMenuCalls += 1;
     contextMenu = menu;
   }
 

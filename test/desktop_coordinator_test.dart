@@ -250,4 +250,79 @@ void main() {
 
     expect(trayClient.title, '专注 25:00');
   });
+
+  test('context menu sync skips countdown-only ticks', () async {
+    var now = DateTime(2026, 4, 5, 13, 0, 0);
+    final trayClient = FakeTrayClient();
+    final controller = LockbarController(
+      platform: FakeLockbarPlatform(),
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => now,
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+    await controller.startKeepAwakeSession(const Duration(minutes: 30));
+    await coordinator.syncContextMenuForTesting(force: true);
+
+    expect(trayClient.setContextMenuCalls, 1);
+
+    now = now.add(const Duration(seconds: 1));
+    await coordinator.syncContextMenuForTesting();
+
+    expect(trayClient.setContextMenuCalls, 1);
+  });
+
+  test(
+    'right click force-refreshes the current countdown before showing menu',
+    () async {
+      var now = DateTime(2026, 4, 5, 13, 0, 0);
+      final trayClient = FakeTrayClient();
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => now,
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+      await controller.startKeepAwakeSession(const Duration(minutes: 30));
+      await coordinator.showContextMenuForTesting();
+
+      var keepAwakeMenu = trayClient.contextMenu!.getMenuItem('keepAwake')!;
+      expect(
+        keepAwakeMenu.submenu!.items!.first.label,
+        'Current: keep awake, 30:00 remaining',
+      );
+      expect(trayClient.popUpContextMenuCalls, 1);
+
+      now = now.add(const Duration(minutes: 10));
+      await coordinator.showContextMenuForTesting();
+
+      keepAwakeMenu = trayClient.contextMenu!.getMenuItem('keepAwake')!;
+      expect(
+        keepAwakeMenu.submenu!.items!.first.label,
+        'Current: keep awake, 20:00 remaining',
+      );
+      expect(trayClient.popUpContextMenuCalls, 2);
+    },
+  );
 }

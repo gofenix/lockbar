@@ -95,6 +95,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   bool _started = false;
   bool _didPrepareSettingsWindow = false;
   String? _lastSyncedLocaleTag;
+  String? _lastContextMenuSignature;
   String? _lastTrayTitle;
   bool? _lastSettingsVisible;
   bool? _lastSuggestionPanelVisible;
@@ -165,8 +166,40 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     await _applyTrayIcon(attention);
   }
 
-  Future<void> _syncContextMenu() async {
+  Future<void> _syncContextMenu({bool force = false}) async {
+    final nextSignature = _contextMenuSignature();
+    if (!force && _lastContextMenuSignature == nextSignature) {
+      return;
+    }
+    _lastContextMenuSignature = nextSignature;
     await trayClient.setContextMenu(buildContextMenu());
+  }
+
+  String _contextMenuSignature() {
+    final activeSuggestion = controller.activeSuggestion;
+    final focusSession = controller.focusSession;
+    final delayedLock = controller.delayedLock;
+    final keepAwakeSession = controller.keepAwakeSession;
+
+    return [
+      controller.effectiveLocale.toLanguageTag(),
+      activeSuggestion == null
+          ? 'suggestion:none'
+          : 'suggestion:${activeSuggestion.trigger.name}',
+      focusSession == null
+          ? 'focus:none'
+          : 'focus:${focusSession.durationMinutes}',
+      delayedLock == null ? 'delayed:none' : 'delayed:active',
+      keepAwakeSession == null
+          ? 'awake:none'
+          : [
+              'awake',
+              keepAwakeSession.preset.name,
+              keepAwakeSession.durationMinutes,
+              keepAwakeSession.isIndefinite,
+            ].join(':'),
+      'launch:${controller.launchAtStartupEnabled}',
+    ].join('|');
   }
 
   Future<void> _syncTrayTitle({bool force = false}) async {
@@ -380,6 +413,16 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     await _syncTrayTitle(force: force);
   }
 
+  @visibleForTesting
+  Future<void> syncContextMenuForTesting({bool force = false}) async {
+    await _syncContextMenu(force: force);
+  }
+
+  @visibleForTesting
+  Future<void> showContextMenuForTesting() async {
+    await _showContextMenu();
+  }
+
   Future<void> _handleControllerChanged() async {
     if (!_started) {
       return;
@@ -503,7 +546,12 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    unawaited(trayClient.popUpContextMenu());
+    unawaited(_showContextMenu());
+  }
+
+  Future<void> _showContextMenu() async {
+    await _syncContextMenu(force: true);
+    await trayClient.popUpContextMenu();
   }
 
   @override
