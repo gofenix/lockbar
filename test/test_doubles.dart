@@ -1,5 +1,6 @@
 import 'package:lockbar/src/desktop_coordinator.dart';
 import 'package:lockbar/src/models/ai_models.dart';
+import 'package:lockbar/src/models/command_panel_models.dart';
 import 'package:lockbar/src/models/lockbar_models.dart';
 import 'package:lockbar/src/platform/lockbar_platform.dart';
 import 'package:lockbar/src/services/ai_context_collector.dart';
@@ -36,12 +37,16 @@ class FakeLockbarPlatform implements LockbarPlatform {
   int showSuggestionPanelCalls = 0;
   int updateSuggestionPanelCalls = 0;
   int hideSuggestionPanelCalls = 0;
+  int showCommandPanelCalls = 0;
+  int updateCommandPanelCalls = 0;
+  int hideCommandPanelCalls = 0;
   bool keepAwakeStartSucceeds = true;
   bool keepAwakeNativeActive = false;
   String? lastNativeLocaleTag;
   Duration? lastKeepAwakeDuration;
   PermissionState calendarPermissionState = PermissionState.notDetermined;
   SuggestionPanelData? lastSuggestionPanelData;
+  CommandPanelData? lastCommandPanelData;
   Set<AiDataSource> lastRequestedSources = const <AiDataSource>{};
   SystemContextSnapshot systemContext = SystemContextSnapshot(
     collectedAt: DateTime(2025),
@@ -52,6 +57,8 @@ class FakeLockbarPlatform implements LockbarPlatform {
   final StreamController<SuggestionPanelAction>
   suggestionPanelActionsController =
       StreamController<SuggestionPanelAction>.broadcast();
+  final StreamController<CommandPanelAction> commandPanelActionsController =
+      StreamController<CommandPanelAction>.broadcast();
 
   @override
   Future<void> activateApp() async {
@@ -71,6 +78,11 @@ class FakeLockbarPlatform implements LockbarPlatform {
   @override
   Future<void> hideSuggestionPanel() async {
     hideSuggestionPanelCalls += 1;
+  }
+
+  @override
+  Future<void> hideCommandPanel() async {
+    hideCommandPanelCalls += 1;
   }
 
   @override
@@ -176,9 +188,25 @@ class FakeLockbarPlatform implements LockbarPlatform {
       suggestionPanelActionsController.stream;
 
   @override
+  Stream<CommandPanelAction> get commandPanelActions =>
+      commandPanelActionsController.stream;
+
+  @override
   Future<void> updateSuggestionPanel(SuggestionPanelData data) async {
     updateSuggestionPanelCalls += 1;
     lastSuggestionPanelData = data;
+  }
+
+  @override
+  Future<void> showCommandPanel(CommandPanelData data) async {
+    showCommandPanelCalls += 1;
+    lastCommandPanelData = data;
+  }
+
+  @override
+  Future<void> updateCommandPanel(CommandPanelData data) async {
+    updateCommandPanelCalls += 1;
+    lastCommandPanelData = data;
   }
 }
 
@@ -203,10 +231,7 @@ class FakeTrayClient implements LockbarTrayClient {
   bool? isTemplate;
   String? toolTip;
   String? title;
-  Menu? contextMenu;
-  int setContextMenuCalls = 0;
   int destroyCalls = 0;
-  int popUpContextMenuCalls = 0;
 
   @override
   void addListener(TrayListener listener) {
@@ -221,17 +246,6 @@ class FakeTrayClient implements LockbarTrayClient {
   @override
   Future<void> destroy() async {
     destroyCalls += 1;
-  }
-
-  @override
-  Future<void> popUpContextMenu() async {
-    popUpContextMenuCalls += 1;
-  }
-
-  @override
-  Future<void> setContextMenu(Menu menu) async {
-    setContextMenuCalls += 1;
-    contextMenu = menu;
   }
 
   @override

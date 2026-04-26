@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'l10n/app_localizations.dart';
 import 'l10n/locale_support.dart';
 import 'lockbar_controller.dart';
 import 'models/ai_models.dart';
+import 'models/command_panel_models.dart';
 import 'models/lockbar_models.dart';
 import 'platform/lockbar_platform.dart';
 
@@ -18,8 +20,6 @@ abstract class LockbarTrayClient {
 
   Future<void> destroy();
 
-  Future<void> setContextMenu(Menu menu);
-
   Future<void> setIcon(
     String path, {
     required int iconSize,
@@ -29,8 +29,6 @@ abstract class LockbarTrayClient {
   Future<void> setTitle(String title);
 
   Future<void> setToolTip(String toolTip);
-
-  Future<void> popUpContextMenu();
 }
 
 class SystemLockbarTrayClient implements LockbarTrayClient {
@@ -52,11 +50,6 @@ class SystemLockbarTrayClient implements LockbarTrayClient {
   }
 
   @override
-  Future<void> setContextMenu(Menu menu) async {
-    await trayManager.setContextMenu(menu);
-  }
-
-  @override
   Future<void> setIcon(
     String path, {
     required int iconSize,
@@ -74,11 +67,6 @@ class SystemLockbarTrayClient implements LockbarTrayClient {
   Future<void> setToolTip(String toolTip) async {
     await trayManager.setToolTip(toolTip);
   }
-
-  @override
-  Future<void> popUpContextMenu() async {
-    await trayManager.popUpContextMenu();
-  }
 }
 
 class LockbarDesktopCoordinator with TrayListener, WindowListener {
@@ -95,13 +83,15 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   bool _started = false;
   bool _didPrepareSettingsWindow = false;
   String? _lastSyncedLocaleTag;
-  String? _lastContextMenuSignature;
   String? _lastTrayTitle;
   bool? _lastSettingsVisible;
   bool? _lastSuggestionPanelVisible;
   String? _lastSuggestionPanelSignature;
   bool? _lastSuggestionIndicatorVisible;
   StreamSubscription<SuggestionPanelAction>? _panelActionsSubscription;
+  StreamSubscription<CommandPanelAction>? _commandPanelActionsSubscription;
+  bool _commandPanelVisible = false;
+  String? _lastCommandPanelSignature;
 
   static const _settingsWindowSize = Size(520, 560);
   static const _settingsWindowMinSize = Size(460, 500);
@@ -118,9 +108,11 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     _panelActionsSubscription = platform.suggestionPanelActions.listen(
       _handleSuggestionPanelAction,
     );
+    _commandPanelActionsSubscription = platform.commandPanelActions.listen(
+      _handleCommandPanelAction,
+    );
 
     await _configureTray();
-    await _syncContextMenu();
     await _syncTrayTitle(force: true);
     await _syncNativeLocale();
     await _syncTrayIconAppearance(force: true);
@@ -133,6 +125,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       return;
     }
     _panelActionsSubscription?.cancel();
+    _commandPanelActionsSubscription?.cancel();
     controller.removeListener(_handleControllerChanged);
     trayClient.removeListener(this);
     windowManager.removeListener(this);
@@ -166,42 +159,6 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     await _applyTrayIcon(attention);
   }
 
-  Future<void> _syncContextMenu({bool force = false}) async {
-    final nextSignature = _contextMenuSignature();
-    if (!force && _lastContextMenuSignature == nextSignature) {
-      return;
-    }
-    _lastContextMenuSignature = nextSignature;
-    await trayClient.setContextMenu(buildContextMenu());
-  }
-
-  String _contextMenuSignature() {
-    final activeSuggestion = controller.activeSuggestion;
-    final focusSession = controller.focusSession;
-    final delayedLock = controller.delayedLock;
-    final keepAwakeSession = controller.keepAwakeSession;
-
-    return [
-      controller.effectiveLocale.toLanguageTag(),
-      activeSuggestion == null
-          ? 'suggestion:none'
-          : 'suggestion:${activeSuggestion.trigger.name}',
-      focusSession == null
-          ? 'focus:none'
-          : 'focus:${focusSession.durationMinutes}',
-      delayedLock == null ? 'delayed:none' : 'delayed:active',
-      keepAwakeSession == null
-          ? 'awake:none'
-          : [
-              'awake',
-              keepAwakeSession.preset.name,
-              keepAwakeSession.durationMinutes,
-              keepAwakeSession.isIndefinite,
-            ].join(':'),
-      'launch:${controller.launchAtStartupEnabled}',
-    ].join('|');
-  }
-
   Future<void> _syncTrayTitle({bool force = false}) async {
     final nextTitle = buildTrayTitle();
     if (!force && _lastTrayTitle == nextTitle) {
@@ -212,188 +169,77 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   @visibleForTesting
-  Menu buildContextMenu() {
+  CommandPanelData buildCommandPanelData() {
     final localizations = localizationsForLocale(controller.effectiveLocale);
-    final items = <MenuItem>[];
-
-    if (controller.activeSuggestion != null) {
-      items.add(
-        MenuItem(
-          key: _MenuAction.reviewSuggestion.name,
-          label: localizations.aiReviewSuggestionAction,
-        ),
-      );
-      items.add(
-        MenuItem(
-          key: _MenuAction.suggestionLockNow.name,
-          label: localizations.lockNow,
-        ),
-      );
-      items.add(
-        MenuItem(
-          key: _MenuAction.suggestionLater.name,
-          label: localizations.aiLaterAction,
-        ),
-      );
-      items.add(
-        MenuItem(
-          key: _MenuAction.suggestionNotNow.name,
-          label: localizations.aiNotNowAction,
-        ),
-      );
-      items.add(MenuItem.separator());
-    }
-
-    if (controller.focusSession == null) {
-      items.add(
-        MenuItem.submenu(
-          key: _MenuAction.startFocus.name,
-          label: localizations.aiStartFocusAction,
-          submenu: Menu(
-            items: [
-              MenuItem(
-                key: _MenuAction.startFocus25.name,
-                label: localizations.aiFocusPreset25,
-              ),
-              MenuItem(
-                key: _MenuAction.startFocus50.name,
-                label: localizations.aiFocusPreset50,
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      items.add(
-        MenuItem(
-          label: focusMenuStatusLabel(localizations, controller.focusRemaining),
-          disabled: true,
-        ),
-      );
-      items.add(
-        MenuItem(
-          key: _MenuAction.cancelFocus.name,
-          label: localizations.aiCancelFocusAction,
-        ),
-      );
-    }
-
-    items.add(
-      MenuItem(
-        key: _MenuAction.endWorkday.name,
-        label: localizations.aiEndWorkdayAction,
-      ),
-    );
-
-    if (controller.delayedLock == null) {
-      items.add(
-        MenuItem.submenu(
-          key: _MenuAction.scheduleLock.name,
-          label: localizations.aiLockInAction,
-          submenu: Menu(
-            items: [
-              MenuItem(
-                key: _MenuAction.lockIn30Seconds.name,
-                label: localizations.aiLockIn30Seconds,
-              ),
-              MenuItem(
-                key: _MenuAction.lockIn2Minutes.name,
-                label: localizations.aiLockIn2Minutes,
-              ),
-              MenuItem(
-                key: _MenuAction.lockIn5Minutes.name,
-                label: localizations.aiLockIn5Minutes,
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      items.add(
-        MenuItem(
-          key: _MenuAction.cancelDelayedLock.name,
-          label: localizations.aiCancelDelayedLockAction,
-        ),
-      );
-    }
-
     final keepAwakeSession = controller.keepAwakeSession;
     final keepAwakeRemaining = controller.keepAwakeRemaining;
-    final keepAwakeItems = <MenuItem>[
-      if (keepAwakeSession != null)
-        MenuItem(
-          label: keepAwakeMenuStatusLabel(
-            localizations,
-            keepAwakeSession,
-            keepAwakeRemaining,
-          ),
-          disabled: true,
-        ),
-      if (keepAwakeSession != null) MenuItem.separator(),
-      MenuItem.checkbox(
-        key: _MenuAction.keepAwake30Minutes.name,
-        label: localizations.keepAwakeFor30MinutesAction,
-        checked: keepAwakeSession?.preset == KeepAwakePreset.thirtyMinutes,
-      ),
-      MenuItem.checkbox(
-        key: _MenuAction.keepAwake1Hour.name,
-        label: localizations.keepAwakeForOneHourAction,
-        checked: keepAwakeSession?.preset == KeepAwakePreset.oneHour,
-      ),
-      MenuItem.checkbox(
-        key: _MenuAction.keepAwake2Hours.name,
-        label: localizations.keepAwakeForTwoHoursAction,
-        checked: keepAwakeSession?.preset == KeepAwakePreset.twoHours,
-      ),
-      MenuItem.checkbox(
-        key: _MenuAction.keepAwakeIndefinitely.name,
-        label: localizations.keepAwakeIndefinitelyAction,
-        checked: keepAwakeSession?.preset == KeepAwakePreset.indefinite,
-      ),
-    ];
-    items.add(
-      MenuItem.submenu(
-        key: _MenuAction.keepAwake.name,
-        label: localizations.keepAwakeAction,
-        submenu: Menu(items: keepAwakeItems),
-      ),
-    );
+    final canLockNow = controller.permissionState == PermissionState.granted;
 
-    if (controller.keepAwakeSession != null) {
-      items.add(
-        MenuItem(
-          key: _MenuAction.cancelKeepAwake.name,
-          label: localizations.cancelKeepAwakeAction,
-        ),
-      );
+    return CommandPanelData(
+      title: 'LockBar',
+      statusText: _commandPanelStatusText(
+        localizations,
+        keepAwakeSession,
+        keepAwakeRemaining,
+      ),
+      subtitleText: canLockNow
+          ? localizations.primaryActionDescription
+          : _permissionSummary(localizations),
+      lockNowLabel: localizations.lockNow,
+      canLockNow: canLockNow,
+      keepAwakeTitle: _cleanMenuTitle(localizations.keepAwakeAction),
+      keepAwakeSubtitle: keepAwakeStatusLabel(
+        localizations,
+        keepAwakeSession,
+        keepAwakeRemaining,
+      ),
+      keepAwakeActive: keepAwakeSession != null,
+      keepAwakePreset: keepAwakeSession?.preset,
+      keepAwake30MinutesLabel: '30m',
+      keepAwake1HourLabel: '1h',
+      keepAwake2HoursLabel: '2h',
+      keepAwakeIndefinitelyLabel: '\u221e',
+      cancelKeepAwakeLabel: localizations.cancelKeepAwakeAction,
+      launchAtLoginLabel: localizations.launchAtLogin,
+      launchAtLoginEnabled: controller.launchAtStartupEnabled,
+      openSettingsLabel: localizations.openSettings,
+      quitLabel: localizations.quitAction,
+    );
+  }
+
+  String _commandPanelStatusText(
+    AppLocalizations localizations,
+    KeepAwakeSessionState? keepAwakeSession,
+    Duration? keepAwakeRemaining,
+  ) {
+    if (controller.permissionState == PermissionState.denied) {
+      return localizations.permissionDeniedTitle;
     }
+    if (controller.permissionState == PermissionState.notDetermined) {
+      return localizations.permissionNotDeterminedTitle;
+    }
+    if (keepAwakeSession == null) {
+      return localizations.trayTitleReady;
+    }
+    if (keepAwakeSession.isIndefinite) {
+      return localizations.trayTitleKeepAwakeIndefinitely;
+    }
+    return localizations.trayTitleKeepAwake(
+      formatClockDuration(keepAwakeRemaining ?? Duration.zero),
+    );
+  }
 
-    items.add(MenuItem.separator());
-    items.add(
-      MenuItem(key: _MenuAction.lockNow.name, label: localizations.lockNow),
-    );
-    items.add(
-      MenuItem.checkbox(
-        key: _MenuAction.launchAtLogin.name,
-        label: localizations.launchAtLogin,
-        checked: controller.launchAtStartupEnabled,
-        onClick: (menuItem) {
-          menuItem.checked = !(menuItem.checked ?? false);
-        },
-      ),
-    );
-    items.add(
-      MenuItem(
-        key: _MenuAction.openSettings.name,
-        label: localizations.openSettings,
-      ),
-    );
-    items.add(MenuItem.separator());
-    items.add(
-      MenuItem(key: _MenuAction.quit.name, label: localizations.quitAction),
-    );
+  String _permissionSummary(AppLocalizations localizations) {
+    return switch (controller.permissionState) {
+      PermissionState.denied => localizations.permissionDeniedTitle,
+      PermissionState.notDetermined =>
+        localizations.permissionNotDeterminedTitle,
+      PermissionState.granted => localizations.primaryActionDescription,
+    };
+  }
 
-    return Menu(items: items);
+  String _cleanMenuTitle(String value) {
+    return value.replaceAll('\u2026', '').trim();
   }
 
   @visibleForTesting
@@ -414,20 +260,27 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   @visibleForTesting
-  Future<void> syncContextMenuForTesting({bool force = false}) async {
-    await _syncContextMenu(force: force);
+  Future<void> syncCommandPanelForTesting({bool force = false}) async {
+    await _syncCommandPanel(force: force);
   }
 
   @visibleForTesting
-  Future<void> showContextMenuForTesting() async {
-    await _showContextMenu();
+  Future<void> showCommandPanelForTesting() async {
+    await _showCommandPanel();
+  }
+
+  @visibleForTesting
+  Future<void> handleCommandPanelActionForTesting(
+    CommandPanelAction action,
+  ) async {
+    await _handleCommandPanelAction(action);
   }
 
   Future<void> _handleControllerChanged() async {
     if (!_started) {
       return;
     }
-    await _syncContextMenu();
+    await _syncCommandPanel();
     await _syncTrayTitle();
     await _syncNativeLocale();
     await _syncTrayIconAppearance();
@@ -539,6 +392,55 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     }
   }
 
+  Future<void> _handleCommandPanelAction(CommandPanelAction action) async {
+    if (action == CommandPanelAction.hide) {
+      _commandPanelVisible = false;
+      _lastCommandPanelSignature = null;
+      return;
+    }
+
+    switch (action) {
+      case CommandPanelAction.lockNow:
+        await _hideCommandPanel();
+        await controller.lockNowFromSettings();
+        break;
+      case CommandPanelAction.keepAwake30Minutes:
+        await controller.startKeepAwakeSession(const Duration(minutes: 30));
+        break;
+      case CommandPanelAction.keepAwake1Hour:
+        await controller.startKeepAwakeSession(const Duration(hours: 1));
+        break;
+      case CommandPanelAction.keepAwake2Hours:
+        await controller.startKeepAwakeSession(const Duration(hours: 2));
+        break;
+      case CommandPanelAction.keepAwakeIndefinitely:
+        await controller.startKeepAwakeIndefinitely();
+        break;
+      case CommandPanelAction.cancelKeepAwake:
+        await controller.cancelKeepAwakeSession();
+        break;
+      case CommandPanelAction.toggleLaunchAtLogin:
+        await controller.setLaunchAtStartup(!controller.launchAtStartupEnabled);
+        break;
+      case CommandPanelAction.openSettings:
+        await _hideCommandPanel();
+        controller.openSettingsWindow();
+        break;
+      case CommandPanelAction.quit:
+        await _hideCommandPanel();
+        await _quitApp();
+        break;
+      case CommandPanelAction.hide:
+        break;
+    }
+  }
+
+  Future<void> _hideCommandPanel() async {
+    _commandPanelVisible = false;
+    _lastCommandPanelSignature = null;
+    await platform.hideCommandPanel();
+  }
+
   @override
   void onTrayIconMouseDown() {
     unawaited(_handlePrimaryTrayAction());
@@ -546,84 +448,26 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    unawaited(_showContextMenu());
+    unawaited(_showCommandPanel());
   }
 
-  Future<void> _showContextMenu() async {
-    await _syncContextMenu(force: true);
-    await trayClient.popUpContextMenu();
+  Future<void> _showCommandPanel() async {
+    final data = buildCommandPanelData();
+    _commandPanelVisible = true;
+    _lastCommandPanelSignature = data.signature;
+    await platform.showCommandPanel(data);
   }
 
-  @override
-  void onTrayMenuItemClick(MenuItem menuItem) {
-    final key = menuItem.key;
-    switch (key) {
-      case 'lockNow':
-        unawaited(controller.lockNowFromSettings());
-        break;
-      case 'launchAtLogin':
-        unawaited(controller.setLaunchAtStartup(menuItem.checked ?? false));
-        break;
-      case 'openSettings':
-        controller.openSettingsWindow();
-        break;
-      case 'quit':
-        unawaited(_quitApp());
-        break;
-      case 'startFocus25':
-        unawaited(controller.startFocusSession(const Duration(minutes: 25)));
-        break;
-      case 'startFocus50':
-        unawaited(controller.startFocusSession(const Duration(minutes: 50)));
-        break;
-      case 'cancelFocus':
-        unawaited(controller.cancelFocusSession());
-        break;
-      case 'endWorkday':
-        unawaited(controller.triggerWorkdayWrapUp());
-        break;
-      case 'lockIn30Seconds':
-        unawaited(controller.scheduleDelayedLock(const Duration(seconds: 30)));
-        break;
-      case 'lockIn2Minutes':
-        unawaited(controller.scheduleDelayedLock(const Duration(minutes: 2)));
-        break;
-      case 'lockIn5Minutes':
-        unawaited(controller.scheduleDelayedLock(const Duration(minutes: 5)));
-        break;
-      case 'cancelDelayedLock':
-        unawaited(controller.cancelDelayedLock());
-        break;
-      case 'keepAwake30Minutes':
-        unawaited(
-          controller.startKeepAwakeSession(const Duration(minutes: 30)),
-        );
-        break;
-      case 'keepAwake1Hour':
-        unawaited(controller.startKeepAwakeSession(const Duration(hours: 1)));
-        break;
-      case 'keepAwake2Hours':
-        unawaited(controller.startKeepAwakeSession(const Duration(hours: 2)));
-        break;
-      case 'keepAwakeIndefinitely':
-        unawaited(controller.startKeepAwakeIndefinitely());
-        break;
-      case 'cancelKeepAwake':
-        unawaited(controller.cancelKeepAwakeSession());
-        break;
-      case 'reviewSuggestion':
-        controller.reopenActiveSuggestionCard();
-        break;
-      case 'suggestionLockNow':
-        unawaited(controller.acceptActiveSuggestionLockNow());
-        break;
-      case 'suggestionLater':
-        unawaited(controller.acceptActiveSuggestionLater());
-        break;
-      case 'suggestionNotNow':
-        unawaited(controller.dismissActiveSuggestionNotNow());
-        break;
+  Future<void> _syncCommandPanel({bool force = false}) async {
+    if (!_commandPanelVisible) {
+      return;
     }
+    final data = buildCommandPanelData();
+    if (!force && _lastCommandPanelSignature == data.signature) {
+      return;
+    }
+    _lastCommandPanelSignature = data.signature;
+    await platform.updateCommandPanel(data);
   }
 
   @override
@@ -648,31 +492,4 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     await trayClient.destroy();
     await platform.quitApp();
   }
-}
-
-enum _MenuAction {
-  reviewSuggestion,
-  suggestionLockNow,
-  suggestionLater,
-  suggestionNotNow,
-  startFocus,
-  startFocus25,
-  startFocus50,
-  cancelFocus,
-  endWorkday,
-  scheduleLock,
-  lockIn30Seconds,
-  lockIn2Minutes,
-  lockIn5Minutes,
-  cancelDelayedLock,
-  keepAwake,
-  keepAwake30Minutes,
-  keepAwake1Hour,
-  keepAwake2Hours,
-  keepAwakeIndefinitely,
-  cancelKeepAwake,
-  lockNow,
-  launchAtLogin,
-  openSettings,
-  quit,
 }

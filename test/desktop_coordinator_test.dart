@@ -3,14 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lockbar/src/desktop_coordinator.dart';
 import 'package:lockbar/src/lockbar_controller.dart';
 import 'package:lockbar/src/models/ai_models.dart';
+import 'package:lockbar/src/models/command_panel_models.dart';
+import 'package:lockbar/src/models/lockbar_models.dart';
 
 import 'test_doubles.dart';
 
 void main() {
-  test('keep awake submenu shows active status and checked preset', () async {
+  test('command panel shows active keep awake status and preset', () async {
     final trayClient = FakeTrayClient();
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted;
     final controller = LockbarController(
-      platform: FakeLockbarPlatform(),
+      platform: platform,
       launchAtStartupService: FakeLaunchAtStartupService(),
       localePreferencesService: FakeLocalePreferencesService(),
       aiMemoryService: FakeAiMemoryService(),
@@ -28,27 +32,22 @@ void main() {
     await controller.initialize();
     await controller.startKeepAwakeSession(const Duration(minutes: 30));
 
-    final menu = coordinator.buildContextMenu();
-    final keepAwakeMenu = menu.getMenuItem('keepAwake');
-    final submenuItems = keepAwakeMenu?.submenu?.items;
+    final data = coordinator.buildCommandPanelData();
 
-    expect(keepAwakeMenu, isNotNull);
-    expect(submenuItems, isNotNull);
-    expect(submenuItems!.first.label, 'Current: keep awake, 30:00 remaining');
-    expect(submenuItems.first.disabled, isTrue);
-    expect(
-      keepAwakeMenu?.submenu?.getMenuItem('keepAwake30Minutes')?.checked,
-      isTrue,
-    );
-    expect(menu.getMenuItem('cancelKeepAwake'), isNotNull);
+    expect(data.statusText, 'Awake 30:00');
+    expect(data.keepAwakeActive, isTrue);
+    expect(data.keepAwakePreset, KeepAwakePreset.thirtyMinutes);
+    expect(data.keepAwakeSubtitle, 'Keep-awake active: 30:00');
   });
 
   test(
-    'keep awake submenu hides active controls when no session is running',
+    'command panel shows idle keep awake controls when no session is running',
     () async {
       final trayClient = FakeTrayClient();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted;
       final controller = LockbarController(
-        platform: FakeLockbarPlatform(),
+        platform: platform,
         launchAtStartupService: FakeLaunchAtStartupService(),
         localePreferencesService: FakeLocalePreferencesService(),
         aiMemoryService: FakeAiMemoryService(),
@@ -64,61 +63,57 @@ void main() {
 
       await controller.initialize();
 
-      final menu = coordinator.buildContextMenu();
-      final keepAwakeMenu = menu.getMenuItem('keepAwake');
-      final submenuItems = keepAwakeMenu?.submenu?.items;
+      final data = coordinator.buildCommandPanelData();
 
-      expect(keepAwakeMenu, isNotNull);
-      expect(submenuItems, isNotNull);
-      expect(submenuItems!.first.label, '30 Minutes');
-      expect(submenuItems.first.disabled, isFalse);
-      expect(menu.getMenuItem('cancelKeepAwake'), isNull);
+      expect(data.statusText, 'Ready');
+      expect(data.keepAwakeActive, isFalse);
+      expect(data.keepAwakePreset, isNull);
+      expect(data.keepAwake30MinutesLabel, '30m');
+      expect(data.keepAwake1HourLabel, '1h');
+      expect(data.keepAwake2HoursLabel, '2h');
+      expect(data.keepAwakeIndefinitelyLabel, '\u221e');
     },
   );
 
-  test(
-    'indefinite keep awake menu shows indefinite status and checked preset',
-    () async {
-      final trayClient = FakeTrayClient();
-      final controller = LockbarController(
-        platform: FakeLockbarPlatform(),
-        launchAtStartupService: FakeLaunchAtStartupService(),
-        localePreferencesService: FakeLocalePreferencesService(),
-        aiMemoryService: FakeAiMemoryService(),
-        aiInferenceClient: FakeAiInferenceClient(),
-        aiContextCollector: FakeAiContextCollector(),
-        initialSystemLocale: const Locale('en'),
-        now: () => DateTime(2026, 4, 5, 13, 0, 0),
-      );
-      final coordinator = LockbarDesktopCoordinator(
-        controller: controller,
-        platform: controller.platform,
-        trayClient: trayClient,
-      );
+  test('command panel shows indefinite keep awake status and preset', () async {
+    final trayClient = FakeTrayClient();
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted;
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
 
-      await controller.initialize();
-      await controller.startKeepAwakeIndefinitely();
+    await controller.initialize();
+    await controller.startKeepAwakeIndefinitely();
 
-      final menu = coordinator.buildContextMenu();
-      final keepAwakeMenu = menu.getMenuItem('keepAwake');
-      final submenuItems = keepAwakeMenu?.submenu?.items;
+    final data = coordinator.buildCommandPanelData();
 
-      expect(submenuItems, isNotNull);
-      expect(submenuItems!.first.label, 'Current: keep awake until stopped');
-      expect(
-        keepAwakeMenu?.submenu?.getMenuItem('keepAwakeIndefinitely')?.checked,
-        isTrue,
-      );
-      expect(menu.getMenuItem('cancelKeepAwake'), isNotNull);
-    },
-  );
+    expect(data.statusText, 'Awake');
+    expect(data.keepAwakeActive, isTrue);
+    expect(data.keepAwakePreset, KeepAwakePreset.indefinite);
+    expect(data.keepAwakeSubtitle, 'Keep-awake active: until you stop it.');
+  });
 
   test(
-    'focus menu shows live status and tray title uses focus countdown',
+    'command panel hides focus controls while tray title still uses focus countdown',
     () async {
       final trayClient = FakeTrayClient();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted;
       final controller = LockbarController(
-        platform: FakeLockbarPlatform(),
+        platform: platform,
         launchAtStartupService: FakeLaunchAtStartupService(),
         localePreferencesService: FakeLocalePreferencesService(),
         aiMemoryService: FakeAiMemoryService(),
@@ -137,11 +132,13 @@ void main() {
       await controller.startFocusSession(const Duration(minutes: 25));
       await coordinator.syncTrayTitleForTesting(force: true);
 
-      final menu = coordinator.buildContextMenu();
+      final data = coordinator.buildCommandPanelData();
 
-      expect(menu.items!.first.label, 'Current: focus, 25:00 remaining');
-      expect(menu.items!.first.disabled, isTrue);
-      expect(menu.getMenuItem('cancelFocus'), isNotNull);
+      expect(data.statusText, 'Ready');
+      expect(
+        data.toMap().values.whereType<String>().join('|'),
+        isNot(contains('Focus')),
+      );
       expect(trayClient.title, 'Focus 25:00');
     },
   );
@@ -251,11 +248,13 @@ void main() {
     expect(trayClient.title, '专注 25:00');
   });
 
-  test('context menu sync skips countdown-only ticks', () async {
+  test('command panel sync refreshes countdown while visible', () async {
     var now = DateTime(2026, 4, 5, 13, 0, 0);
     final trayClient = FakeTrayClient();
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted;
     final controller = LockbarController(
-      platform: FakeLockbarPlatform(),
+      platform: platform,
       launchAtStartupService: FakeLaunchAtStartupService(),
       localePreferencesService: FakeLocalePreferencesService(),
       aiMemoryService: FakeAiMemoryService(),
@@ -272,23 +271,27 @@ void main() {
 
     await controller.initialize();
     await controller.startKeepAwakeSession(const Duration(minutes: 30));
-    await coordinator.syncContextMenuForTesting(force: true);
+    await coordinator.showCommandPanelForTesting();
 
-    expect(trayClient.setContextMenuCalls, 1);
+    expect(platform.showCommandPanelCalls, 1);
+    expect(platform.lastCommandPanelData?.statusText, 'Awake 30:00');
 
-    now = now.add(const Duration(seconds: 1));
-    await coordinator.syncContextMenuForTesting();
+    now = now.add(const Duration(minutes: 10));
+    await coordinator.syncCommandPanelForTesting();
 
-    expect(trayClient.setContextMenuCalls, 1);
+    expect(platform.updateCommandPanelCalls, 1);
+    expect(platform.lastCommandPanelData?.statusText, 'Awake 20:00');
   });
 
   test(
-    'right click force-refreshes the current countdown before showing menu',
+    'right click shows command panel without opening native context menu',
     () async {
       var now = DateTime(2026, 4, 5, 13, 0, 0);
       final trayClient = FakeTrayClient();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted;
       final controller = LockbarController(
-        platform: FakeLockbarPlatform(),
+        platform: platform,
         launchAtStartupService: FakeLaunchAtStartupService(),
         localePreferencesService: FakeLocalePreferencesService(),
         aiMemoryService: FakeAiMemoryService(),
@@ -305,24 +308,58 @@ void main() {
 
       await controller.initialize();
       await controller.startKeepAwakeSession(const Duration(minutes: 30));
-      await coordinator.showContextMenuForTesting();
+      await coordinator.showCommandPanelForTesting();
 
-      var keepAwakeMenu = trayClient.contextMenu!.getMenuItem('keepAwake')!;
-      expect(
-        keepAwakeMenu.submenu!.items!.first.label,
-        'Current: keep awake, 30:00 remaining',
-      );
-      expect(trayClient.popUpContextMenuCalls, 1);
+      expect(platform.showCommandPanelCalls, 1);
+      expect(platform.lastCommandPanelData?.statusText, 'Awake 30:00');
 
       now = now.add(const Duration(minutes: 10));
-      await coordinator.showContextMenuForTesting();
+      await coordinator.showCommandPanelForTesting();
 
-      keepAwakeMenu = trayClient.contextMenu!.getMenuItem('keepAwake')!;
-      expect(
-        keepAwakeMenu.submenu!.items!.first.label,
-        'Current: keep awake, 20:00 remaining',
+      expect(platform.showCommandPanelCalls, 2);
+      expect(platform.lastCommandPanelData?.statusText, 'Awake 20:00');
+    },
+  );
+
+  test(
+    'command panel actions control keep awake and launch at login',
+    () async {
+      final trayClient = FakeTrayClient();
+      final launchAtStartup = FakeLaunchAtStartupService();
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform()
+          ..permissionState = PermissionState.granted,
+        launchAtStartupService: launchAtStartup,
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => DateTime(2026, 4, 5, 13, 0, 0),
       );
-      expect(trayClient.popUpContextMenuCalls, 2);
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+
+      await coordinator.handleCommandPanelActionForTesting(
+        CommandPanelAction.keepAwake1Hour,
+      );
+      expect(controller.keepAwakeSession?.preset, KeepAwakePreset.oneHour);
+
+      await coordinator.handleCommandPanelActionForTesting(
+        CommandPanelAction.cancelKeepAwake,
+      );
+      expect(controller.keepAwakeSession, isNull);
+
+      await coordinator.handleCommandPanelActionForTesting(
+        CommandPanelAction.toggleLaunchAtLogin,
+      );
+      expect(controller.launchAtStartupEnabled, isTrue);
+      expect(launchAtStartup.setEnabledCalls, 1);
     },
   );
 }

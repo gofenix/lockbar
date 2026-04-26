@@ -12,6 +12,7 @@ import Network
 private let lockbarChannelName = "lockbar/macos"
 private let lockbarPermissionRequestKey = "lockbar.hasRequestedPermission"
 private let suggestionPanelWidth: CGFloat = 420
+private let commandPanelWidth: CGFloat = 340
 private let keepAwakeReason = "LockBar keep-awake" as CFString
 
 private enum KeepAwakeAssertionError: Error {
@@ -19,8 +20,14 @@ private enum KeepAwakeAssertionError: Error {
 }
 
 private final class SuggestionPanel: NSPanel {
+  var onCancel: (() -> Void)?
+
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { false }
+
+  override func cancelOperation(_ sender: Any?) {
+    onCancel?()
+  }
 }
 
 private final class HoverTrackingView: NSView {
@@ -364,6 +371,506 @@ private final class SuggestionPanelController: NSObject {
   }
 }
 
+private struct CommandPanelPayload {
+  let title: String
+  let statusText: String
+  let subtitleText: String
+  let lockNowLabel: String
+  let canLockNow: Bool
+  let keepAwakeTitle: String
+  let keepAwakeSubtitle: String
+  let keepAwakeActive: Bool
+  let keepAwakePreset: String?
+  let keepAwake30MinutesLabel: String
+  let keepAwake1HourLabel: String
+  let keepAwake2HoursLabel: String
+  let keepAwakeIndefinitelyLabel: String
+  let cancelKeepAwakeLabel: String
+  let launchAtLoginLabel: String
+  let launchAtLoginEnabled: Bool
+  let openSettingsLabel: String
+  let quitLabel: String
+
+  init?(arguments: [String: Any]?) {
+    guard let arguments,
+          let title = arguments["title"] as? String,
+          let statusText = arguments["statusText"] as? String,
+          let subtitleText = arguments["subtitleText"] as? String,
+          let lockNowLabel = arguments["lockNowLabel"] as? String,
+          let canLockNow = arguments["canLockNow"] as? Bool,
+          let keepAwakeTitle = arguments["keepAwakeTitle"] as? String,
+          let keepAwakeSubtitle = arguments["keepAwakeSubtitle"] as? String,
+          let keepAwakeActive = arguments["keepAwakeActive"] as? Bool,
+          let keepAwake30MinutesLabel = arguments["keepAwake30MinutesLabel"] as? String,
+          let keepAwake1HourLabel = arguments["keepAwake1HourLabel"] as? String,
+          let keepAwake2HoursLabel = arguments["keepAwake2HoursLabel"] as? String,
+          let keepAwakeIndefinitelyLabel = arguments["keepAwakeIndefinitelyLabel"] as? String,
+          let cancelKeepAwakeLabel = arguments["cancelKeepAwakeLabel"] as? String,
+          let launchAtLoginLabel = arguments["launchAtLoginLabel"] as? String,
+          let launchAtLoginEnabled = arguments["launchAtLoginEnabled"] as? Bool,
+          let openSettingsLabel = arguments["openSettingsLabel"] as? String,
+          let quitLabel = arguments["quitLabel"] as? String
+    else {
+      return nil
+    }
+
+    self.title = title
+    self.statusText = statusText
+    self.subtitleText = subtitleText
+    self.lockNowLabel = lockNowLabel
+    self.canLockNow = canLockNow
+    self.keepAwakeTitle = keepAwakeTitle
+    self.keepAwakeSubtitle = keepAwakeSubtitle
+    self.keepAwakeActive = keepAwakeActive
+    self.keepAwakePreset = arguments["keepAwakePreset"] as? String
+    self.keepAwake30MinutesLabel = keepAwake30MinutesLabel
+    self.keepAwake1HourLabel = keepAwake1HourLabel
+    self.keepAwake2HoursLabel = keepAwake2HoursLabel
+    self.keepAwakeIndefinitelyLabel = keepAwakeIndefinitelyLabel
+    self.cancelKeepAwakeLabel = cancelKeepAwakeLabel
+    self.launchAtLoginLabel = launchAtLoginLabel
+    self.launchAtLoginEnabled = launchAtLoginEnabled
+    self.openSettingsLabel = openSettingsLabel
+    self.quitLabel = quitLabel
+  }
+}
+
+private final class CommandPanelController: NSObject {
+  private let onAction: (String) -> Void
+  private let panel: SuggestionPanel
+  private let rootView = NSView()
+  private let stackView = NSStackView()
+  private let titleLabel = NSTextField(labelWithString: "")
+  private let statusLabel = NSTextField(labelWithString: "")
+  private let subtitleLabel = NSTextField(wrappingLabelWithString: "")
+  private let lockNowButton = NSButton(title: "", target: nil, action: nil)
+  private let keepAwakeSection = NSView()
+  private let keepAwakeTitleLabel = NSTextField(labelWithString: "")
+  private let keepAwakeSubtitleLabel = NSTextField(labelWithString: "")
+  private let keepAwakeSwitch = NSSwitch()
+  private let keepAwakeSegments = NSSegmentedControl(labels: ["30m", "1h", "2h", "∞"], trackingMode: .selectOne, target: nil, action: nil)
+  private let cancelKeepAwakeButton = NSButton(title: "", target: nil, action: nil)
+  private let launchAtLoginTitleLabel = NSTextField(labelWithString: "")
+  private let launchAtLoginSwitch = NSSwitch()
+  private let openSettingsButton = NSButton(title: "", target: nil, action: nil)
+  private let quitButton = NSButton(title: "", target: nil, action: nil)
+
+  private var currentPayload: CommandPanelPayload?
+  private var localEventMonitor: Any?
+  private var globalEventMonitor: Any?
+
+  init(onAction: @escaping (String) -> Void) {
+    self.onAction = onAction
+    self.panel = SuggestionPanel(
+      contentRect: NSRect(x: 0, y: 0, width: commandPanelWidth, height: 360),
+      styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
+      backing: .buffered,
+      defer: false
+    )
+    super.init()
+    configurePanel()
+    configureContent()
+  }
+
+  func show(payload: CommandPanelPayload) {
+    update(payload: payload, animated: false)
+    positionPanel(animated: false)
+    panel.orderFrontRegardless()
+    startEventMonitoring()
+  }
+
+  func update(payload: CommandPanelPayload, animated: Bool = false) {
+    currentPayload = payload
+    titleLabel.stringValue = payload.title
+    statusLabel.stringValue = payload.statusText
+    subtitleLabel.stringValue = payload.subtitleText
+    lockNowButton.title = payload.lockNowLabel
+    lockNowButton.isEnabled = payload.canLockNow
+    keepAwakeTitleLabel.stringValue = payload.keepAwakeTitle
+    keepAwakeSubtitleLabel.stringValue = payload.keepAwakeSubtitle
+    keepAwakeSwitch.state = payload.keepAwakeActive ? .on : .off
+    cancelKeepAwakeButton.title = payload.cancelKeepAwakeLabel
+    cancelKeepAwakeButton.isHidden = !payload.keepAwakeActive
+    launchAtLoginTitleLabel.stringValue = payload.launchAtLoginLabel
+    launchAtLoginSwitch.state = payload.launchAtLoginEnabled ? .on : .off
+    openSettingsButton.title = payload.openSettingsLabel
+    quitButton.title = payload.quitLabel
+
+    keepAwakeSegments.setLabel(payload.keepAwake30MinutesLabel, forSegment: 0)
+    keepAwakeSegments.setLabel(payload.keepAwake1HourLabel, forSegment: 1)
+    keepAwakeSegments.setLabel(payload.keepAwake2HoursLabel, forSegment: 2)
+    keepAwakeSegments.setLabel(payload.keepAwakeIndefinitelyLabel, forSegment: 3)
+    keepAwakeSegments.selectedSegment = selectedKeepAwakeSegment(for: payload.keepAwakePreset)
+
+    keepAwakeSection.layer?.backgroundColor = (
+      payload.keepAwakeActive
+        ? NSColor(calibratedWhite: 0.82, alpha: 1).cgColor
+        : NSColor(calibratedWhite: 0.90, alpha: 1).cgColor
+    )
+
+    layoutPanel(animated: animated)
+  }
+
+  func hide(emitAction: Bool = false) {
+    stopEventMonitoring()
+    panel.orderOut(nil)
+    if emitAction {
+      onAction("hide")
+    }
+  }
+
+  private func configurePanel() {
+    panel.isReleasedWhenClosed = false
+    panel.hasShadow = true
+    panel.isFloatingPanel = false
+    panel.level = .floating
+    panel.collectionBehavior = [.moveToActiveSpace, .transient]
+    panel.titleVisibility = .hidden
+    panel.titlebarAppearsTransparent = true
+    panel.standardWindowButton(.closeButton)?.isHidden = true
+    panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+    panel.standardWindowButton(.zoomButton)?.isHidden = true
+    panel.isMovableByWindowBackground = false
+    panel.backgroundColor = .clear
+    panel.animationBehavior = .utilityWindow
+    panel.onCancel = { [weak self] in
+      self?.hide(emitAction: true)
+    }
+  }
+
+  private func configureContent() {
+    rootView.translatesAutoresizingMaskIntoConstraints = false
+    rootView.wantsLayer = true
+    rootView.layer?.cornerRadius = 14
+    rootView.layer?.borderWidth = 1
+    rootView.layer?.borderColor = NSColor.separatorColor.cgColor
+    rootView.layer?.backgroundColor = NSColor(calibratedWhite: 0.92, alpha: 1).cgColor
+
+    stackView.orientation = .vertical
+    stackView.spacing = 10
+    stackView.translatesAutoresizingMaskIntoConstraints = false
+
+    stackView.addArrangedSubview(makeHeader())
+    stackView.addArrangedSubview(makeKeepAwakeSection())
+    stackView.addArrangedSubview(makeLaunchAtLoginRow())
+    stackView.addArrangedSubview(makeFooter())
+
+    rootView.addSubview(stackView)
+    NSLayoutConstraint.activate([
+      stackView.leadingAnchor.constraint(equalTo: rootView.leadingAnchor, constant: 14),
+      stackView.trailingAnchor.constraint(equalTo: rootView.trailingAnchor, constant: -14),
+      stackView.topAnchor.constraint(equalTo: rootView.topAnchor, constant: 14),
+      stackView.bottomAnchor.constraint(equalTo: rootView.bottomAnchor, constant: -14),
+      rootView.widthAnchor.constraint(equalToConstant: commandPanelWidth),
+    ])
+
+    panel.contentView = rootView
+  }
+
+  private func startEventMonitoring() {
+    stopEventMonitoring()
+    localEventMonitor = NSEvent.addLocalMonitorForEvents(
+      matching: [.leftMouseDown, .rightMouseDown]
+    ) { [weak self] event in
+      guard let self else { return event }
+      if self.panel.isVisible && event.window !== self.panel {
+        self.hide(emitAction: true)
+      }
+      return event
+    }
+    globalEventMonitor = NSEvent.addGlobalMonitorForEvents(
+      matching: [.leftMouseDown, .rightMouseDown]
+    ) { [weak self] _ in
+      guard let self, self.panel.isVisible else { return }
+      self.hide(emitAction: true)
+    }
+  }
+
+  private func stopEventMonitoring() {
+    if let localEventMonitor {
+      NSEvent.removeMonitor(localEventMonitor)
+      self.localEventMonitor = nil
+    }
+    if let globalEventMonitor {
+      NSEvent.removeMonitor(globalEventMonitor)
+      self.globalEventMonitor = nil
+    }
+  }
+
+  private func makeHeader() -> NSView {
+    let container = NSView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+
+    let icon = makeIcon(systemName: "lock.fill")
+    let labels = NSStackView()
+    labels.orientation = .vertical
+    labels.spacing = 2
+    labels.alignment = .leading
+    labels.translatesAutoresizingMaskIntoConstraints = false
+
+    titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+    titleLabel.textColor = .secondaryLabelColor
+    statusLabel.font = .systemFont(ofSize: 22, weight: .semibold)
+    subtitleLabel.font = .systemFont(ofSize: 12, weight: .medium)
+    subtitleLabel.textColor = .secondaryLabelColor
+    subtitleLabel.maximumNumberOfLines = 2
+
+    labels.addArrangedSubview(titleLabel)
+    labels.addArrangedSubview(statusLabel)
+    labels.addArrangedSubview(subtitleLabel)
+
+    lockNowButton.target = self
+    lockNowButton.action = #selector(handleLockNow)
+    lockNowButton.bezelStyle = .rounded
+    lockNowButton.controlSize = .large
+    lockNowButton.keyEquivalent = "\r"
+
+    container.addSubview(icon)
+    container.addSubview(labels)
+    container.addSubview(lockNowButton)
+    NSLayoutConstraint.activate([
+      container.heightAnchor.constraint(greaterThanOrEqualToConstant: 86),
+      icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 4),
+      icon.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+      icon.widthAnchor.constraint(equalToConstant: 36),
+      icon.heightAnchor.constraint(equalToConstant: 36),
+      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+      labels.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
+      labels.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -2),
+      lockNowButton.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+      lockNowButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      lockNowButton.leadingAnchor.constraint(greaterThanOrEqualTo: labels.trailingAnchor, constant: 10),
+    ])
+    return container
+  }
+
+  private func makeKeepAwakeSection() -> NSView {
+    keepAwakeSection.translatesAutoresizingMaskIntoConstraints = false
+    keepAwakeSection.wantsLayer = true
+    keepAwakeSection.layer?.cornerRadius = 10
+
+    let icon = makeIcon(systemName: "cup.and.saucer.fill")
+    let labels = NSStackView()
+    labels.orientation = .vertical
+    labels.spacing = 2
+    labels.alignment = .leading
+    labels.translatesAutoresizingMaskIntoConstraints = false
+
+    keepAwakeTitleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
+    keepAwakeSubtitleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+    keepAwakeSubtitleLabel.textColor = .secondaryLabelColor
+    labels.addArrangedSubview(keepAwakeTitleLabel)
+    labels.addArrangedSubview(keepAwakeSubtitleLabel)
+
+    keepAwakeSwitch.target = self
+    keepAwakeSwitch.action = #selector(handleKeepAwakeSwitch)
+    keepAwakeSwitch.controlSize = .large
+
+    keepAwakeSegments.target = self
+    keepAwakeSegments.action = #selector(handleKeepAwakeSegment)
+    keepAwakeSegments.segmentStyle = .rounded
+    keepAwakeSegments.controlSize = .large
+
+    cancelKeepAwakeButton.target = self
+    cancelKeepAwakeButton.action = #selector(handleCancelKeepAwake)
+    cancelKeepAwakeButton.bezelStyle = .inline
+    cancelKeepAwakeButton.controlSize = .small
+
+    keepAwakeSection.addSubview(icon)
+    keepAwakeSection.addSubview(labels)
+    keepAwakeSection.addSubview(keepAwakeSwitch)
+    keepAwakeSection.addSubview(keepAwakeSegments)
+    keepAwakeSection.addSubview(cancelKeepAwakeButton)
+
+    NSLayoutConstraint.activate([
+      keepAwakeSection.heightAnchor.constraint(greaterThanOrEqualToConstant: 128),
+      icon.leadingAnchor.constraint(equalTo: keepAwakeSection.leadingAnchor, constant: 14),
+      icon.topAnchor.constraint(equalTo: keepAwakeSection.topAnchor, constant: 18),
+      icon.widthAnchor.constraint(equalToConstant: 34),
+      icon.heightAnchor.constraint(equalToConstant: 34),
+      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+      labels.topAnchor.constraint(equalTo: keepAwakeSection.topAnchor, constant: 16),
+      keepAwakeSwitch.trailingAnchor.constraint(equalTo: keepAwakeSection.trailingAnchor, constant: -14),
+      keepAwakeSwitch.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
+      labels.trailingAnchor.constraint(lessThanOrEqualTo: keepAwakeSwitch.leadingAnchor, constant: -12),
+      keepAwakeSegments.leadingAnchor.constraint(equalTo: labels.leadingAnchor),
+      keepAwakeSegments.trailingAnchor.constraint(equalTo: keepAwakeSection.trailingAnchor, constant: -14),
+      keepAwakeSegments.topAnchor.constraint(equalTo: labels.bottomAnchor, constant: 14),
+      cancelKeepAwakeButton.leadingAnchor.constraint(equalTo: labels.leadingAnchor),
+      cancelKeepAwakeButton.topAnchor.constraint(equalTo: keepAwakeSegments.bottomAnchor, constant: 8),
+      cancelKeepAwakeButton.bottomAnchor.constraint(lessThanOrEqualTo: keepAwakeSection.bottomAnchor, constant: -10),
+    ])
+
+    return keepAwakeSection
+  }
+
+  private func makeLaunchAtLoginRow() -> NSView {
+    let container = NSView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+
+    let icon = makeIcon(systemName: "bolt.fill")
+    launchAtLoginTitleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+    launchAtLoginTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+    launchAtLoginSwitch.target = self
+    launchAtLoginSwitch.action = #selector(handleLaunchAtLoginSwitch)
+    launchAtLoginSwitch.controlSize = .large
+
+    container.addSubview(icon)
+    container.addSubview(launchAtLoginTitleLabel)
+    container.addSubview(launchAtLoginSwitch)
+    NSLayoutConstraint.activate([
+      container.heightAnchor.constraint(equalToConstant: 64),
+      icon.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 4),
+      icon.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 34),
+      icon.heightAnchor.constraint(equalToConstant: 34),
+      launchAtLoginTitleLabel.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+      launchAtLoginTitleLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      launchAtLoginSwitch.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -4),
+      launchAtLoginSwitch.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      launchAtLoginTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: launchAtLoginSwitch.leadingAnchor, constant: -12),
+    ])
+    return container
+  }
+
+  private func makeFooter() -> NSView {
+    let container = NSView()
+    container.translatesAutoresizingMaskIntoConstraints = false
+
+    openSettingsButton.target = self
+    openSettingsButton.action = #selector(handleOpenSettings)
+    openSettingsButton.bezelStyle = .rounded
+    openSettingsButton.controlSize = .large
+    openSettingsButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+    openSettingsButton.imagePosition = .imageLeading
+
+    quitButton.target = self
+    quitButton.action = #selector(handleQuit)
+    quitButton.bezelStyle = .texturedRounded
+    quitButton.controlSize = .large
+    quitButton.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+    quitButton.imagePosition = .imageOnly
+
+    container.addSubview(openSettingsButton)
+    container.addSubview(quitButton)
+    NSLayoutConstraint.activate([
+      container.heightAnchor.constraint(equalToConstant: 48),
+      openSettingsButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 48),
+      openSettingsButton.trailingAnchor.constraint(equalTo: quitButton.leadingAnchor, constant: -18),
+      openSettingsButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      openSettingsButton.heightAnchor.constraint(equalToConstant: 34),
+      quitButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -4),
+      quitButton.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+      quitButton.widthAnchor.constraint(equalToConstant: 42),
+      quitButton.heightAnchor.constraint(equalToConstant: 34),
+    ])
+    return container
+  }
+
+  private func makeIcon(systemName: String) -> NSImageView {
+    let imageView = NSImageView()
+    imageView.translatesAutoresizingMaskIntoConstraints = false
+    imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
+    imageView.image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)
+    imageView.contentTintColor = .controlAccentColor
+    imageView.imageScaling = .scaleProportionallyUpOrDown
+    return imageView
+  }
+
+  private func layoutPanel(animated: Bool) {
+    rootView.layoutSubtreeIfNeeded()
+    let targetSize = rootView.fittingSize
+    let frame = panel.frameRect(forContentRect: NSRect(
+      x: 0,
+      y: 0,
+      width: commandPanelWidth,
+      height: max(targetSize.height, 320)
+    ))
+
+    var nextFrame = panel.frame
+    nextFrame.size = frame.size
+    nextFrame.origin = panelOrigin(for: frame.size)
+    panel.setFrame(nextFrame, display: true, animate: animated)
+  }
+
+  private func positionPanel(animated: Bool) {
+    layoutPanel(animated: animated)
+  }
+
+  private func panelOrigin(for size: NSSize) -> NSPoint {
+    guard let screenFrame = NSScreen.main?.visibleFrame else {
+      return NSPoint(x: 0, y: 0)
+    }
+
+    let x = screenFrame.maxX - size.width - 16
+    let y = screenFrame.maxY - size.height - 10
+    return NSPoint(x: x, y: y)
+  }
+
+  private func selectedKeepAwakeSegment(for preset: String?) -> Int {
+    switch preset {
+    case "thirtyMinutes":
+      return 0
+    case "oneHour":
+      return 1
+    case "twoHours":
+      return 2
+    case "indefinite":
+      return 3
+    default:
+      return -1
+    }
+  }
+
+  private func closeForAction(_ action: String) {
+    hide()
+    onAction(action)
+  }
+
+  @objc private func handleLockNow() {
+    closeForAction("lockNow")
+  }
+
+  @objc private func handleKeepAwakeSwitch() {
+    if currentPayload?.keepAwakeActive == true {
+      onAction("cancelKeepAwake")
+    } else {
+      onAction("keepAwake1Hour")
+    }
+  }
+
+  @objc private func handleKeepAwakeSegment() {
+    switch keepAwakeSegments.selectedSegment {
+    case 0:
+      onAction("keepAwake30Minutes")
+    case 1:
+      onAction("keepAwake1Hour")
+    case 2:
+      onAction("keepAwake2Hours")
+    case 3:
+      onAction("keepAwakeIndefinitely")
+    default:
+      break
+    }
+  }
+
+  @objc private func handleCancelKeepAwake() {
+    onAction("cancelKeepAwake")
+  }
+
+  @objc private func handleLaunchAtLoginSwitch() {
+    onAction("toggleLaunchAtLogin")
+  }
+
+  @objc private func handleOpenSettings() {
+    closeForAction("openSettings")
+  }
+
+  @objc private func handleQuit() {
+    closeForAction("quit")
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   private let calendarStore = EKEventStore()
   private let isoFormatter = ISO8601DateFormatter()
@@ -376,6 +883,10 @@ class MainFlutterWindow: NSWindow {
   private lazy var suggestionPanelController = SuggestionPanelController {
     [weak self] action in
     self?.emitSuggestionPanelAction(action)
+  }
+  private lazy var commandPanelController = CommandPanelController {
+    [weak self] action in
+    self?.emitCommandPanelAction(action)
   }
 
   override func awakeFromNib() {
@@ -401,6 +912,10 @@ class MainFlutterWindow: NSWindow {
 
   private func emitSuggestionPanelAction(_ action: String) {
     platformChannel?.invokeMethod("suggestionPanelAction", arguments: ["action": action])
+  }
+
+  private func emitCommandPanelAction(_ action: String) {
+    platformChannel?.invokeMethod("commandPanelAction", arguments: ["action": action])
   }
 
   private func startNetworkMonitor() {
@@ -493,6 +1008,15 @@ class MainFlutterWindow: NSWindow {
         result(nil)
       case "hideSuggestionPanel":
         self.suggestionPanelController.hide()
+        result(nil)
+      case "showCommandPanel":
+        self.handleCommandPanel(arguments: call.arguments as? [String: Any], isUpdate: false)
+        result(nil)
+      case "updateCommandPanel":
+        self.handleCommandPanel(arguments: call.arguments as? [String: Any], isUpdate: true)
+        result(nil)
+      case "hideCommandPanel":
+        self.commandPanelController.hide()
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
@@ -764,6 +1288,18 @@ class MainFlutterWindow: NSWindow {
       suggestionPanelController.update(payload: payload, animated: true)
     } else {
       suggestionPanelController.show(payload: payload)
+    }
+  }
+
+  private func handleCommandPanel(arguments: [String: Any]?, isUpdate: Bool) {
+    guard let payload = CommandPanelPayload(arguments: arguments) else {
+      return
+    }
+
+    if isUpdate {
+      commandPanelController.update(payload: payload, animated: true)
+    } else {
+      commandPanelController.show(payload: payload)
     }
   }
 

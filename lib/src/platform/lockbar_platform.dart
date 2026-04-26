@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:async';
 
 import '../models/ai_models.dart';
+import '../models/command_panel_models.dart';
 import '../models/lockbar_models.dart';
 
 abstract class LockbarPlatform {
@@ -45,12 +46,23 @@ abstract class LockbarPlatform {
   Future<void> updateSuggestionPanel(SuggestionPanelData data);
 
   Future<void> hideSuggestionPanel();
+
+  Stream<CommandPanelAction> get commandPanelActions;
+
+  Future<void> showCommandPanel(CommandPanelData data);
+
+  Future<void> updateCommandPanel(CommandPanelData data);
+
+  Future<void> hideCommandPanel();
 }
 
 class MethodChannelLockbarPlatform implements LockbarPlatform {
   static const MethodChannel _channel = MethodChannel('lockbar/macos');
   static final StreamController<SuggestionPanelAction> _panelActionsController =
       StreamController<SuggestionPanelAction>.broadcast();
+  static final StreamController<CommandPanelAction>
+  _commandPanelActionsController =
+      StreamController<CommandPanelAction>.broadcast();
   static bool _handlerInitialized = false;
 
   MethodChannelLockbarPlatform() {
@@ -59,17 +71,24 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
     }
     _handlerInitialized = true;
     _channel.setMethodCallHandler((call) async {
-      if (call.method != 'suggestionPanelAction') {
-        throw PlatformException(
-          code: 'unsupported_callback',
-          message: 'Unsupported native callback: ${call.method}',
-        );
-      }
-
       final arguments = call.arguments as Map<dynamic, dynamic>? ?? const {};
       final rawAction = arguments['action'] as String?;
-      final action = _parseSuggestionPanelAction(rawAction);
-      _panelActionsController.add(action);
+
+      switch (call.method) {
+        case 'suggestionPanelAction':
+          _panelActionsController.add(_parseSuggestionPanelAction(rawAction));
+          break;
+        case 'commandPanelAction':
+          _commandPanelActionsController.add(
+            CommandPanelAction.fromStorageKey(rawAction),
+          );
+          break;
+        default:
+          throw PlatformException(
+            code: 'unsupported_callback',
+            message: 'Unsupported native callback: ${call.method}',
+          );
+      }
     });
   }
 
@@ -203,6 +222,25 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
   @override
   Future<void> hideSuggestionPanel() {
     return _channel.invokeMethod<void>('hideSuggestionPanel');
+  }
+
+  @override
+  Stream<CommandPanelAction> get commandPanelActions =>
+      _commandPanelActionsController.stream;
+
+  @override
+  Future<void> showCommandPanel(CommandPanelData data) {
+    return _channel.invokeMethod<void>('showCommandPanel', data.toMap());
+  }
+
+  @override
+  Future<void> updateCommandPanel(CommandPanelData data) {
+    return _channel.invokeMethod<void>('updateCommandPanel', data.toMap());
+  }
+
+  @override
+  Future<void> hideCommandPanel() {
+    return _channel.invokeMethod<void>('hideCommandPanel');
   }
 
   PermissionState _parsePermissionState(String? rawState) {
