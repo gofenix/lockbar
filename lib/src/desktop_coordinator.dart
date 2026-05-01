@@ -169,11 +169,12 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   @visibleForTesting
-  CommandPanelData buildCommandPanelData() {
+  Future<CommandPanelData> buildCommandPanelData() async {
     final localizations = localizationsForLocale(controller.effectiveLocale);
     final keepAwakeSession = controller.keepAwakeSession;
     final keepAwakeRemaining = controller.keepAwakeRemaining;
     final canLockNow = controller.permissionState == PermissionState.granted;
+    final bluetoothDevices = await _bluetoothBatteryDevicesForCommandPanel();
 
     return CommandPanelData(
       title: 'LockBar',
@@ -200,11 +201,24 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       keepAwake2HoursLabel: '2h',
       keepAwakeIndefinitelyLabel: '\u221e',
       cancelKeepAwakeLabel: localizations.cancelKeepAwakeAction,
+      bluetoothDevicesTitle: localizations.commandPanelBluetoothDevicesTitle,
+      bluetoothDevices: bluetoothDevices,
       launchAtLoginLabel: localizations.launchAtLogin,
       launchAtLoginEnabled: controller.launchAtStartupEnabled,
       openSettingsLabel: localizations.openSettings,
       quitLabel: localizations.quitAction,
     );
+  }
+
+  Future<List<BluetoothBatteryDevice>>
+  _bluetoothBatteryDevicesForCommandPanel() async {
+    try {
+      final devices = await platform.getBluetoothBatteryDevices();
+      return devices.where((device) => device.hasBatteryLevel).toList()
+        ..sort(BluetoothBatteryDevice.compareByName);
+    } catch (_) {
+      return const [];
+    }
   }
 
   String _commandPanelStatusText(
@@ -452,7 +466,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _showCommandPanel() async {
-    final data = buildCommandPanelData();
+    final data = await buildCommandPanelData();
     _commandPanelVisible = true;
     _lastCommandPanelSignature = data.signature;
     await platform.showCommandPanel(data);
@@ -462,7 +476,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     if (!_commandPanelVisible) {
       return;
     }
-    final data = buildCommandPanelData();
+    final data = await buildCommandPanelData();
     if (!force && _lastCommandPanelSignature == data.signature) {
       return;
     }

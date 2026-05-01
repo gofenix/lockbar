@@ -94,6 +94,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get launchAtLogin => '登录时启动';
 
   @override
+  String get commandPanelBluetoothDevicesTitle => '蓝牙设备';
+
+  @override
   String get launchAtLoginDescription => '每次开机登录后，都让 LockBar 自动常驻在菜单栏。';
 
   @override
@@ -996,6 +999,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get launchAtLogin => '登录时启动';
+
+  @override
+  String get commandPanelBluetoothDevicesTitle => '蓝牙设备';
 
   @override
   String get launchAtLoginDescription => '每次开机登录后，都让 LockBar 自动常驻在菜单栏。';

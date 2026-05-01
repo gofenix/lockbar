@@ -39,6 +39,8 @@ abstract class LockbarPlatform {
 
   Future<KeepAwakePlatformState> stopKeepAwake();
 
+  Future<List<BluetoothBatteryDevice>> getBluetoothBatteryDevices();
+
   Stream<SuggestionPanelAction> get suggestionPanelActions;
 
   Future<void> showSuggestionPanel(SuggestionPanelData data);
@@ -203,6 +205,22 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
       'stopKeepAwake',
     );
     return KeepAwakePlatformState.fromMap(result);
+  }
+
+  @override
+  Future<List<BluetoothBatteryDevice>> getBluetoothBatteryDevices() async {
+    final result = await _channel.invokeListMethod<dynamic>(
+      'getBluetoothBatteryDevices',
+    );
+    final devices =
+        (result ?? const <dynamic>[])
+            .whereType<Map<dynamic, dynamic>>()
+            .map(BluetoothBatteryDevice.fromMap)
+            .whereType<BluetoothBatteryDevice>()
+            .where((device) => device.hasBatteryLevel)
+            .toList()
+          ..sort(BluetoothBatteryDevice.compareByName);
+    return devices;
   }
 
   @override

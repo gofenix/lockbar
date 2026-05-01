@@ -36,6 +36,7 @@
   "openSystemSettings": "Open System Settings",
   "controlsTitle": "Controls",
   "launchAtLogin": "Launch at Login",
+  "commandPanelBluetoothDevicesTitle": "Bluetooth Devices",
   "launchAtLoginDescription": "Keep LockBar in the menu bar after every restart.",
   "languageTitle": "Language",
   "languageDescription": "Choose whether LockBar follows the system language or uses a manual override.",

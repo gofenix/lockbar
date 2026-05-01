@@ -98,6 +98,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get launchAtLogin => 'Launch at Login';
 
   @override
+  String get commandPanelBluetoothDevicesTitle => 'Bluetooth Devices';
+
+  @override
   String get launchAtLoginDescription =>
       'Keep LockBar in the menu bar after every restart.';
 

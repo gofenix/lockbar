@@ -255,6 +255,12 @@ abstract class AppLocalizations {
   /// **'Launch at Login'**
   String get launchAtLogin;
 
+  /// No description provided for @commandPanelBluetoothDevicesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Devices'**
+  String get commandPanelBluetoothDevicesTitle;
+
   /// No description provided for @launchAtLoginDescription.
   ///
   /// In en, this message translates to:

@@ -26,6 +26,82 @@ enum CommandPanelAction {
   }
 }
 
+class BluetoothBatteryDevice {
+  const BluetoothBatteryDevice({
+    required this.name,
+    this.batteryLevel,
+    this.leftBatteryLevel,
+    this.rightBatteryLevel,
+    this.caseBatteryLevel,
+  });
+
+  final String name;
+  final int? batteryLevel;
+  final int? leftBatteryLevel;
+  final int? rightBatteryLevel;
+  final int? caseBatteryLevel;
+
+  bool get hasBatteryLevel =>
+      batteryLevel != null ||
+      leftBatteryLevel != null ||
+      rightBatteryLevel != null ||
+      caseBatteryLevel != null;
+
+  Map<String, Object?> toMap() => {
+    'name': name,
+    'batteryLevel': batteryLevel,
+    'leftBatteryLevel': leftBatteryLevel,
+    'rightBatteryLevel': rightBatteryLevel,
+    'caseBatteryLevel': caseBatteryLevel,
+  };
+
+  String get signature => [
+    name,
+    batteryLevel ?? 'none',
+    leftBatteryLevel ?? 'none',
+    rightBatteryLevel ?? 'none',
+    caseBatteryLevel ?? 'none',
+  ].join(':');
+
+  static BluetoothBatteryDevice? fromMap(Map<dynamic, dynamic> map) {
+    final name = (map['name'] as String?)?.trim();
+    if (name == null || name.isEmpty) {
+      return null;
+    }
+
+    return BluetoothBatteryDevice(
+      name: name,
+      batteryLevel: _parseBatteryLevel(map['batteryLevel']),
+      leftBatteryLevel: _parseBatteryLevel(map['leftBatteryLevel']),
+      rightBatteryLevel: _parseBatteryLevel(map['rightBatteryLevel']),
+      caseBatteryLevel: _parseBatteryLevel(map['caseBatteryLevel']),
+    );
+  }
+
+  static int compareByName(
+    BluetoothBatteryDevice lhs,
+    BluetoothBatteryDevice rhs,
+  ) {
+    final lhsName = lhs.name.toLowerCase();
+    final rhsName = rhs.name.toLowerCase();
+    final nameOrder = lhsName.compareTo(rhsName);
+    return nameOrder == 0 ? lhs.name.compareTo(rhs.name) : nameOrder;
+  }
+
+  static int? _parseBatteryLevel(Object? value) {
+    final level = switch (value) {
+      final int intValue => intValue,
+      final num numValue => numValue.round(),
+      final String stringValue => int.tryParse(stringValue.trim()),
+      _ => null,
+    };
+    if (level == null || level < 0 || level > 100) {
+      return null;
+    }
+    return level;
+  }
+}
+
 class CommandPanelData {
   const CommandPanelData({
     required this.title,
@@ -42,6 +118,8 @@ class CommandPanelData {
     required this.keepAwake2HoursLabel,
     required this.keepAwakeIndefinitelyLabel,
     required this.cancelKeepAwakeLabel,
+    required this.bluetoothDevicesTitle,
+    required this.bluetoothDevices,
     required this.launchAtLoginLabel,
     required this.launchAtLoginEnabled,
     required this.openSettingsLabel,
@@ -62,6 +140,8 @@ class CommandPanelData {
   final String keepAwake2HoursLabel;
   final String keepAwakeIndefinitelyLabel;
   final String cancelKeepAwakeLabel;
+  final String bluetoothDevicesTitle;
+  final List<BluetoothBatteryDevice> bluetoothDevices;
   final String launchAtLoginLabel;
   final bool launchAtLoginEnabled;
   final String openSettingsLabel;
@@ -82,6 +162,10 @@ class CommandPanelData {
     'keepAwake2HoursLabel': keepAwake2HoursLabel,
     'keepAwakeIndefinitelyLabel': keepAwakeIndefinitelyLabel,
     'cancelKeepAwakeLabel': cancelKeepAwakeLabel,
+    'bluetoothDevicesTitle': bluetoothDevicesTitle,
+    'bluetoothDevices': bluetoothDevices
+        .map((device) => device.toMap())
+        .toList(growable: false),
     'launchAtLoginLabel': launchAtLoginLabel,
     'launchAtLoginEnabled': launchAtLoginEnabled,
     'openSettingsLabel': openSettingsLabel,
@@ -103,6 +187,8 @@ class CommandPanelData {
     keepAwake2HoursLabel,
     keepAwakeIndefinitelyLabel,
     cancelKeepAwakeLabel,
+    bluetoothDevicesTitle,
+    bluetoothDevices.map((device) => device.signature).join(','),
     launchAtLoginLabel,
     launchAtLoginEnabled,
     openSettingsLabel,

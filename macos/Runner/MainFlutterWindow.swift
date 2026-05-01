@@ -5,6 +5,7 @@ import CoreWLAN
 import EventKit
 import FlutterMacOS
 import IOBluetooth
+import IOKit
 import IOKit.pwr_mgt
 import LaunchAtLogin
 import Network
@@ -371,6 +372,82 @@ private final class SuggestionPanelController: NSObject {
   }
 }
 
+private struct CommandPanelBluetoothDevicePayload {
+  let name: String
+  let batteryLevel: Int?
+  let leftBatteryLevel: Int?
+  let rightBatteryLevel: Int?
+  let caseBatteryLevel: Int?
+
+  var hasBatteryLevel: Bool {
+    batteryLevel != nil ||
+      leftBatteryLevel != nil ||
+      rightBatteryLevel != nil ||
+      caseBatteryLevel != nil
+  }
+
+  var batterySummary: String {
+    var parts: [String] = []
+    if let leftBatteryLevel {
+      parts.append("L \(leftBatteryLevel)%")
+    }
+    if let rightBatteryLevel {
+      parts.append("R \(rightBatteryLevel)%")
+    }
+    if let caseBatteryLevel {
+      parts.append("Case \(caseBatteryLevel)%")
+    }
+    if !parts.isEmpty {
+      return parts.joined(separator: " / ")
+    }
+    if let batteryLevel {
+      return "\(batteryLevel)%"
+    }
+    return ""
+  }
+
+  init?(dictionary: [String: Any]) {
+    guard let rawName = dictionary["name"] as? String else {
+      return nil
+    }
+    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else {
+      return nil
+    }
+
+    self.name = name
+    self.batteryLevel = Self.parseBatteryLevel(dictionary["batteryLevel"])
+    self.leftBatteryLevel = Self.parseBatteryLevel(dictionary["leftBatteryLevel"])
+    self.rightBatteryLevel = Self.parseBatteryLevel(dictionary["rightBatteryLevel"])
+    self.caseBatteryLevel = Self.parseBatteryLevel(dictionary["caseBatteryLevel"])
+  }
+
+  private static func parseBatteryLevel(_ value: Any?) -> Int? {
+    if value is NSNull {
+      return nil
+    }
+
+    if let number = value as? NSNumber {
+      let doubleValue = number.doubleValue
+      let level = doubleValue > 0 && doubleValue < 1
+        ? Int((doubleValue * 100).rounded())
+        : number.intValue
+      return (0...100).contains(level) ? level : nil
+    }
+
+    if let string = value as? String {
+      let cleaned = string
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "%", with: "")
+      if let level = Int(cleaned), (0...100).contains(level) {
+        return level
+      }
+    }
+
+    return nil
+  }
+}
+
 private struct CommandPanelPayload {
   let title: String
   let statusText: String
@@ -386,6 +463,8 @@ private struct CommandPanelPayload {
   let keepAwake2HoursLabel: String
   let keepAwakeIndefinitelyLabel: String
   let cancelKeepAwakeLabel: String
+  let bluetoothDevicesTitle: String
+  let bluetoothDevices: [CommandPanelBluetoothDevicePayload]
   let launchAtLoginLabel: String
   let launchAtLoginEnabled: Bool
   let openSettingsLabel: String
@@ -406,6 +485,7 @@ private struct CommandPanelPayload {
           let keepAwake2HoursLabel = arguments["keepAwake2HoursLabel"] as? String,
           let keepAwakeIndefinitelyLabel = arguments["keepAwakeIndefinitelyLabel"] as? String,
           let cancelKeepAwakeLabel = arguments["cancelKeepAwakeLabel"] as? String,
+          let bluetoothDevicesTitle = arguments["bluetoothDevicesTitle"] as? String,
           let launchAtLoginLabel = arguments["launchAtLoginLabel"] as? String,
           let launchAtLoginEnabled = arguments["launchAtLoginEnabled"] as? Bool,
           let openSettingsLabel = arguments["openSettingsLabel"] as? String,
@@ -428,6 +508,11 @@ private struct CommandPanelPayload {
     self.keepAwake2HoursLabel = keepAwake2HoursLabel
     self.keepAwakeIndefinitelyLabel = keepAwakeIndefinitelyLabel
     self.cancelKeepAwakeLabel = cancelKeepAwakeLabel
+    self.bluetoothDevicesTitle = bluetoothDevicesTitle
+    self.bluetoothDevices = (arguments["bluetoothDevices"] as? [Any] ?? [])
+      .compactMap { $0 as? [String: Any] }
+      .compactMap(CommandPanelBluetoothDevicePayload.init(dictionary:))
+      .filter { $0.hasBatteryLevel }
     self.launchAtLoginLabel = launchAtLoginLabel
     self.launchAtLoginEnabled = launchAtLoginEnabled
     self.openSettingsLabel = openSettingsLabel
@@ -450,6 +535,9 @@ private final class CommandPanelController: NSObject {
   private let keepAwakeSwitch = NSSwitch()
   private let keepAwakeSegments = NSSegmentedControl(labels: ["30m", "1h", "2h", "∞"], trackingMode: .selectOne, target: nil, action: nil)
   private let cancelKeepAwakeButton = NSButton(title: "", target: nil, action: nil)
+  private let bluetoothSection = NSView()
+  private let bluetoothTitleLabel = NSTextField(labelWithString: "")
+  private let bluetoothRowsStackView = NSStackView()
   private let launchAtLoginTitleLabel = NSTextField(labelWithString: "")
   private let launchAtLoginSwitch = NSSwitch()
   private let openSettingsButton = NSButton(title: "", target: nil, action: nil)
@@ -491,6 +579,9 @@ private final class CommandPanelController: NSObject {
     keepAwakeSwitch.state = payload.keepAwakeActive ? .on : .off
     cancelKeepAwakeButton.title = payload.cancelKeepAwakeLabel
     cancelKeepAwakeButton.isHidden = !payload.keepAwakeActive
+    bluetoothTitleLabel.stringValue = payload.bluetoothDevicesTitle
+    rebuildBluetoothRows(devices: payload.bluetoothDevices)
+    bluetoothSection.isHidden = payload.bluetoothDevices.isEmpty
     launchAtLoginTitleLabel.stringValue = payload.launchAtLoginLabel
     launchAtLoginSwitch.state = payload.launchAtLoginEnabled ? .on : .off
     openSettingsButton.title = payload.openSettingsLabel
@@ -552,6 +643,7 @@ private final class CommandPanelController: NSObject {
 
     stackView.addArrangedSubview(makeHeader())
     stackView.addArrangedSubview(makeKeepAwakeSection())
+    stackView.addArrangedSubview(makeBluetoothSection())
     stackView.addArrangedSubview(makeLaunchAtLoginRow())
     stackView.addArrangedSubview(makeFooter())
 
@@ -702,6 +794,86 @@ private final class CommandPanelController: NSObject {
     ])
 
     return keepAwakeSection
+  }
+
+  private func makeBluetoothSection() -> NSView {
+    bluetoothSection.translatesAutoresizingMaskIntoConstraints = false
+    bluetoothSection.wantsLayer = true
+    bluetoothSection.layer?.cornerRadius = 9
+    bluetoothSection.layer?.backgroundColor = NSColor(calibratedWhite: 0.96, alpha: 1).cgColor
+    bluetoothSection.isHidden = true
+
+    let icon = makeIcon(systemName: "dot.radiowaves.left.and.right")
+    icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+
+    let content = NSStackView()
+    content.orientation = .vertical
+    content.spacing = 6
+    content.alignment = .leading
+    content.translatesAutoresizingMaskIntoConstraints = false
+
+    bluetoothTitleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+    bluetoothTitleLabel.textColor = .secondaryLabelColor
+
+    bluetoothRowsStackView.orientation = .vertical
+    bluetoothRowsStackView.spacing = 4
+    bluetoothRowsStackView.alignment = .leading
+    bluetoothRowsStackView.translatesAutoresizingMaskIntoConstraints = false
+
+    content.addArrangedSubview(bluetoothTitleLabel)
+    content.addArrangedSubview(bluetoothRowsStackView)
+
+    bluetoothSection.addSubview(icon)
+    bluetoothSection.addSubview(content)
+
+    NSLayoutConstraint.activate([
+      bluetoothSection.heightAnchor.constraint(greaterThanOrEqualToConstant: 58),
+      icon.leadingAnchor.constraint(equalTo: bluetoothSection.leadingAnchor, constant: 14),
+      icon.topAnchor.constraint(equalTo: bluetoothSection.topAnchor, constant: 14),
+      icon.widthAnchor.constraint(equalToConstant: 24),
+      icon.heightAnchor.constraint(equalToConstant: 24),
+      content.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
+      content.trailingAnchor.constraint(equalTo: bluetoothSection.trailingAnchor, constant: -14),
+      content.topAnchor.constraint(equalTo: bluetoothSection.topAnchor, constant: 10),
+      content.bottomAnchor.constraint(equalTo: bluetoothSection.bottomAnchor, constant: -10),
+    ])
+
+    return bluetoothSection
+  }
+
+  private func rebuildBluetoothRows(devices: [CommandPanelBluetoothDevicePayload]) {
+    bluetoothRowsStackView.arrangedSubviews.forEach { view in
+      bluetoothRowsStackView.removeArrangedSubview(view)
+      view.removeFromSuperview()
+    }
+
+    for device in devices {
+      let row = NSStackView()
+      row.orientation = .horizontal
+      row.spacing = 8
+      row.alignment = .centerY
+      row.distribution = .fill
+      row.translatesAutoresizingMaskIntoConstraints = false
+
+      let nameLabel = NSTextField(labelWithString: device.name)
+      nameLabel.font = .systemFont(ofSize: 13, weight: .medium)
+      nameLabel.lineBreakMode = .byTruncatingTail
+      nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+      let batteryLabel = NSTextField(labelWithString: device.batterySummary)
+      batteryLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+      batteryLabel.textColor = .labelColor
+      batteryLabel.alignment = .right
+      batteryLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+      row.addArrangedSubview(nameLabel)
+      row.addArrangedSubview(batteryLabel)
+      bluetoothRowsStackView.addArrangedSubview(row)
+
+      NSLayoutConstraint.activate([
+        row.widthAnchor.constraint(equalTo: bluetoothRowsStackView.widthAnchor),
+      ])
+    }
   }
 
   private func makeLaunchAtLoginRow() -> NSView {
@@ -871,6 +1043,59 @@ private final class CommandPanelController: NSObject {
   }
 }
 
+private struct BluetoothBatteryRecord {
+  let names: Set<String>
+  let addresses: Set<String>
+  let batteryLevel: Int?
+  let leftBatteryLevel: Int?
+  let rightBatteryLevel: Int?
+  let caseBatteryLevel: Int?
+
+  var hasBatteryLevel: Bool {
+    batteryLevel != nil ||
+      leftBatteryLevel != nil ||
+      rightBatteryLevel != nil ||
+      caseBatteryLevel != nil
+  }
+
+  var signature: String {
+    let battery = batteryLevel.map { String($0) } ?? "none"
+    let leftBattery = leftBatteryLevel.map { String($0) } ?? "none"
+    let rightBattery = rightBatteryLevel.map { String($0) } ?? "none"
+    let caseBattery = caseBatteryLevel.map { String($0) } ?? "none"
+    let parts: [String] = [
+      names.sorted().joined(separator: ","),
+      addresses.sorted().joined(separator: ","),
+      battery,
+      leftBattery,
+      rightBattery,
+      caseBattery,
+    ]
+    return parts.joined(separator: "|")
+  }
+}
+
+private struct BluetoothBatteryLevels {
+  var batteryLevel: Int?
+  var leftBatteryLevel: Int?
+  var rightBatteryLevel: Int?
+  var caseBatteryLevel: Int?
+
+  var hasBatteryLevel: Bool {
+    batteryLevel != nil ||
+      leftBatteryLevel != nil ||
+      rightBatteryLevel != nil ||
+      caseBatteryLevel != nil
+  }
+
+  mutating func merge(_ record: BluetoothBatteryRecord) {
+    batteryLevel = batteryLevel ?? record.batteryLevel
+    leftBatteryLevel = leftBatteryLevel ?? record.leftBatteryLevel
+    rightBatteryLevel = rightBatteryLevel ?? record.rightBatteryLevel
+    caseBatteryLevel = caseBatteryLevel ?? record.caseBatteryLevel
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   private let calendarStore = EKEventStore()
   private let isoFormatter = ISO8601DateFormatter()
@@ -1000,6 +1225,8 @@ class MainFlutterWindow: NSWindow {
         result(self.keepAwakeState())
       case "stopKeepAwake":
         result(self.stopKeepAwake())
+      case "getBluetoothBatteryDevices":
+        result(self.bluetoothBatteryDevices())
       case "showSuggestionPanel":
         self.handleSuggestionPanel(arguments: call.arguments as? [String: Any], isUpdate: false)
         result(nil)
@@ -1373,14 +1600,305 @@ class MainFlutterWindow: NSWindow {
   }
 
   private func connectedBluetoothDevices() -> [String] {
+    connectedPairedBluetoothDevices()
+      .compactMap { $0.nameOrAddress }
+      .sorted()
+  }
+
+  private func connectedPairedBluetoothDevices() -> [IOBluetoothDevice] {
     guard let devices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
       return []
     }
 
-    return devices
-      .filter { $0.isConnected() }
-      .compactMap { $0.nameOrAddress }
-      .sorted()
+    return devices.filter { $0.isConnected() }
+  }
+
+  private func bluetoothBatteryDevices() -> [[String: Any]] {
+    let records = bluetoothBatteryRecordsFromRegistry()
+    if records.isEmpty {
+      return []
+    }
+
+    return connectedPairedBluetoothDevices()
+      .compactMap { device -> [String: Any]? in
+        let displayName = bluetoothDisplayName(for: device)
+        let normalizedName = normalizeBluetoothName(displayName)
+        let normalizedAddress = normalizeBluetoothAddress(device.addressString)
+        var levels = BluetoothBatteryLevels()
+
+        for record in records where bluetoothRecord(
+          record,
+          matchesName: normalizedName,
+          address: normalizedAddress
+        ) {
+          levels.merge(record)
+        }
+
+        guard levels.hasBatteryLevel else {
+          return nil
+        }
+
+        var payload: [String: Any] = ["name": displayName]
+        if let batteryLevel = levels.batteryLevel {
+          payload["batteryLevel"] = batteryLevel
+        }
+        if let leftBatteryLevel = levels.leftBatteryLevel {
+          payload["leftBatteryLevel"] = leftBatteryLevel
+        }
+        if let rightBatteryLevel = levels.rightBatteryLevel {
+          payload["rightBatteryLevel"] = rightBatteryLevel
+        }
+        if let caseBatteryLevel = levels.caseBatteryLevel {
+          payload["caseBatteryLevel"] = caseBatteryLevel
+        }
+        return payload
+      }
+      .sorted { lhs, rhs in
+        let lhsName = (lhs["name"] as? String ?? "").localizedCaseInsensitiveCompare(rhs["name"] as? String ?? "")
+        return lhsName == .orderedAscending
+      }
+  }
+
+  private func bluetoothDisplayName(for device: IOBluetoothDevice) -> String {
+    let candidates = [
+      device.name,
+      device.nameOrAddress,
+      device.addressString,
+    ]
+    for candidate in candidates {
+      let name = candidate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      if !name.isEmpty {
+        return name
+      }
+    }
+    return "Bluetooth Device"
+  }
+
+  private func bluetoothRecord(
+    _ record: BluetoothBatteryRecord,
+    matchesName normalizedName: String,
+    address normalizedAddress: String
+  ) -> Bool {
+    if !normalizedAddress.isEmpty && record.addresses.contains(normalizedAddress) {
+      return true
+    }
+
+    guard !normalizedName.isEmpty else {
+      return false
+    }
+
+    return record.names.contains { recordName in
+      recordName == normalizedName ||
+        (recordName.count >= 4 && normalizedName.contains(recordName)) ||
+        (normalizedName.count >= 4 && recordName.contains(normalizedName))
+    }
+  }
+
+  private func bluetoothBatteryRecordsFromRegistry() -> [BluetoothBatteryRecord] {
+    let registryClasses = [
+      "AppleDeviceManagementHIDEventService",
+      "IOBluetoothHIDDriver",
+      "IOHIDDevice",
+    ]
+
+    var records: [BluetoothBatteryRecord] = []
+    var seenSignatures = Set<String>()
+    for registryClass in registryClasses {
+      for record in bluetoothBatteryRecords(matchingRegistryClass: registryClass)
+        where !seenSignatures.contains(record.signature) {
+        records.append(record)
+        seenSignatures.insert(record.signature)
+      }
+    }
+    return records
+  }
+
+  private func bluetoothBatteryRecords(
+    matchingRegistryClass registryClass: String
+  ) -> [BluetoothBatteryRecord] {
+    guard let matchingDictionary = IOServiceMatching(registryClass) else {
+      return []
+    }
+
+    var iterator: io_iterator_t = 0
+    let result = IOServiceGetMatchingServices(
+      kIOMainPortDefault,
+      matchingDictionary,
+      &iterator
+    )
+    guard result == KERN_SUCCESS else {
+      return []
+    }
+    defer { IOObjectRelease(iterator) }
+
+    var records: [BluetoothBatteryRecord] = []
+    while true {
+      let service = IOIteratorNext(iterator)
+      if service == 0 {
+        break
+      }
+      if let record = bluetoothBatteryRecord(for: service) {
+        records.append(record)
+      }
+      IOObjectRelease(service)
+    }
+    return records
+  }
+
+  private func bluetoothBatteryRecord(for service: io_registry_entry_t) -> BluetoothBatteryRecord? {
+    let properties = registryProperties(for: service)
+    let names = Set(stringValues(
+      from: properties,
+      keys: [
+        "Product",
+        "ProductName",
+        "DeviceName",
+        "Name",
+        "UserVisibleName",
+        "BluetoothDeviceName",
+      ]
+    ).map(normalizeBluetoothName).filter { !$0.isEmpty })
+    let addresses = Set(stringValues(
+      from: properties,
+      keys: [
+        "DeviceAddress",
+        "BluetoothDeviceAddress",
+        "BD_ADDR",
+        "Address",
+        "BluetoothAddress",
+      ]
+    ).map(normalizeBluetoothAddress).filter { !$0.isEmpty })
+
+    let record = BluetoothBatteryRecord(
+      names: names,
+      addresses: addresses,
+      batteryLevel: batteryLevel(
+        from: properties,
+        keys: [
+          "BatteryPercent",
+          "BatteryPercentage",
+          "BatteryLevel",
+          "Battery Level",
+          "AppleDeviceBatteryLevel",
+          "DeviceBatteryPercent",
+          "BatteryPercentCombined",
+          "BatteryPercentSingle",
+        ]
+      ),
+      leftBatteryLevel: batteryLevel(
+        from: properties,
+        keys: [
+          "BatteryPercentLeft",
+          "BatteryPercentLeftBud",
+          "LeftBatteryPercent",
+          "BatteryPercentL",
+          "BatteryLevelLeft",
+          "LeftBatteryLevel",
+        ]
+      ),
+      rightBatteryLevel: batteryLevel(
+        from: properties,
+        keys: [
+          "BatteryPercentRight",
+          "BatteryPercentRightBud",
+          "RightBatteryPercent",
+          "BatteryPercentR",
+          "BatteryLevelRight",
+          "RightBatteryLevel",
+        ]
+      ),
+      caseBatteryLevel: batteryLevel(
+        from: properties,
+        keys: [
+          "BatteryPercentCase",
+          "CaseBatteryPercent",
+          "BatteryLevelCase",
+          "CaseBatteryLevel",
+        ]
+      )
+    )
+
+    guard record.hasBatteryLevel && (!record.names.isEmpty || !record.addresses.isEmpty) else {
+      return nil
+    }
+    return record
+  }
+
+  private func registryProperties(for service: io_registry_entry_t) -> [String: Any] {
+    var properties: Unmanaged<CFMutableDictionary>?
+    let result = IORegistryEntryCreateCFProperties(
+      service,
+      &properties,
+      kCFAllocatorDefault,
+      0
+    )
+    guard result == KERN_SUCCESS,
+          let dictionary = properties?.takeRetainedValue() as? [String: Any]
+    else {
+      return [:]
+    }
+    return dictionary
+  }
+
+  private func stringValues(from properties: [String: Any], keys: [String]) -> [String] {
+    keys.compactMap { key in
+      if let value = properties[key] as? String {
+        return value
+      }
+      if let value = properties[key] as? Data {
+        return String(data: value, encoding: .utf8)
+      }
+      if let value = properties[key] as? NSNumber {
+        return value.stringValue
+      }
+      return nil
+    }
+  }
+
+  private func batteryLevel(from properties: [String: Any], keys: [String]) -> Int? {
+    for key in keys {
+      if let level = parseBatteryLevel(properties[key]) {
+        return level
+      }
+    }
+    return nil
+  }
+
+  private func parseBatteryLevel(_ value: Any?) -> Int? {
+    if value is NSNull {
+      return nil
+    }
+
+    if let number = value as? NSNumber {
+      let doubleValue = number.doubleValue
+      let level = doubleValue > 0 && doubleValue < 1
+        ? Int((doubleValue * 100).rounded())
+        : number.intValue
+      return (0...100).contains(level) ? level : nil
+    }
+
+    if let string = value as? String {
+      let cleaned = string
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "%", with: "")
+      if let level = Int(cleaned), (0...100).contains(level) {
+        return level
+      }
+    }
+
+    return nil
+  }
+
+  private func normalizeBluetoothName(_ value: String?) -> String {
+    (value ?? "")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .lowercased()
+  }
+
+  private func normalizeBluetoothAddress(_ value: String?) -> String {
+    (value ?? "")
+      .lowercased()
+      .filter { $0.isLetter || $0.isNumber }
   }
 
   private func currentCalendarEvents() -> (current: [String: Any]?, next: [String: Any]?) {

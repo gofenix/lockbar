@@ -54,6 +54,7 @@ class FakeLockbarPlatform implements LockbarPlatform {
     bluetoothDevices: const [],
     networkReachable: true,
   );
+  List<BluetoothBatteryDevice> bluetoothBatteryDevices = const [];
   final StreamController<SuggestionPanelAction>
   suggestionPanelActionsController =
       StreamController<SuggestionPanelAction>.broadcast();
@@ -176,6 +177,10 @@ class FakeLockbarPlatform implements LockbarPlatform {
     lastRequestedSources = sources;
     return systemContext;
   }
+
+  @override
+  Future<List<BluetoothBatteryDevice>> getBluetoothBatteryDevices() async =>
+      bluetoothBatteryDevices;
 
   @override
   Future<void> showSuggestionPanel(SuggestionPanelData data) async {

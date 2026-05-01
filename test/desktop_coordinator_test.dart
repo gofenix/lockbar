@@ -32,7 +32,7 @@ void main() {
     await controller.initialize();
     await controller.startKeepAwakeSession(const Duration(minutes: 30));
 
-    final data = coordinator.buildCommandPanelData();
+    final data = await coordinator.buildCommandPanelData();
 
     expect(data.statusText, 'Awake 30:00');
     expect(data.keepAwakeActive, isTrue);
@@ -63,7 +63,7 @@ void main() {
 
       await controller.initialize();
 
-      final data = coordinator.buildCommandPanelData();
+      final data = await coordinator.buildCommandPanelData();
 
       expect(data.statusText, 'Ready');
       expect(data.keepAwakeActive, isFalse);
@@ -98,7 +98,7 @@ void main() {
     await controller.initialize();
     await controller.startKeepAwakeIndefinitely();
 
-    final data = coordinator.buildCommandPanelData();
+    final data = await coordinator.buildCommandPanelData();
 
     expect(data.statusText, 'Awake');
     expect(data.keepAwakeActive, isTrue);
@@ -132,7 +132,7 @@ void main() {
       await controller.startFocusSession(const Duration(minutes: 25));
       await coordinator.syncTrayTitleForTesting(force: true);
 
-      final data = coordinator.buildCommandPanelData();
+      final data = await coordinator.buildCommandPanelData();
 
       expect(data.statusText, 'Ready');
       expect(
@@ -362,4 +362,133 @@ void main() {
       expect(launchAtStartup.setEnabledCalls, 1);
     },
   );
+
+  test('command panel includes sorted bluetooth battery devices', () async {
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted
+      ..bluetoothBatteryDevices = const [
+        BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 82),
+        BluetoothBatteryDevice(
+          name: 'AirPods Pro',
+          leftBatteryLevel: 76,
+          rightBatteryLevel: 71,
+          caseBatteryLevel: 54,
+        ),
+      ];
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: FakeTrayClient(),
+    );
+
+    await controller.initialize();
+
+    final data = await coordinator.buildCommandPanelData();
+    final payload = data.toMap();
+
+    expect(data.bluetoothDevicesTitle, 'Bluetooth Devices');
+    expect(data.bluetoothDevices.map((device) => device.name), [
+      'AirPods Pro',
+      'MX Master 3S',
+    ]);
+    expect(payload['bluetoothDevices'], [
+      {
+        'name': 'AirPods Pro',
+        'batteryLevel': null,
+        'leftBatteryLevel': 76,
+        'rightBatteryLevel': 71,
+        'caseBatteryLevel': 54,
+      },
+      {
+        'name': 'MX Master 3S',
+        'batteryLevel': 82,
+        'leftBatteryLevel': null,
+        'rightBatteryLevel': null,
+        'caseBatteryLevel': null,
+      },
+    ]);
+  });
+
+  test(
+    'command panel filters bluetooth devices with no battery data',
+    () async {
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted
+        ..bluetoothBatteryDevices = const [
+          BluetoothBatteryDevice(name: 'Keyboard'),
+        ];
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: FakeTrayClient(),
+      );
+
+      await controller.initialize();
+
+      final data = await coordinator.buildCommandPanelData();
+
+      expect(data.bluetoothDevices, isEmpty);
+      expect(data.toMap()['bluetoothDevices'], isEmpty);
+    },
+  );
+
+  test('command panel sync updates when bluetooth battery changes', () async {
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted
+      ..bluetoothBatteryDevices = const [
+        BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 82),
+      ];
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: FakeTrayClient(),
+    );
+
+    await controller.initialize();
+    await coordinator.showCommandPanelForTesting();
+
+    expect(platform.showCommandPanelCalls, 1);
+    expect(
+      platform.lastCommandPanelData?.bluetoothDevices.single.batteryLevel,
+      82,
+    );
+
+    platform.bluetoothBatteryDevices = const [
+      BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 81),
+    ];
+    await coordinator.syncCommandPanelForTesting();
+
+    expect(platform.updateCommandPanelCalls, 1);
+    expect(
+      platform.lastCommandPanelData?.bluetoothDevices.single.batteryLevel,
+      81,
+    );
+  });
 }
