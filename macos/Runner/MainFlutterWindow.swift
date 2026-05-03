@@ -16,6 +16,34 @@ private let suggestionPanelWidth: CGFloat = 420
 private let commandPanelWidth: CGFloat = 340
 private let keepAwakeReason = "LockBar keep-awake" as CFString
 
+func configureCommandPanelPrimaryStackView(_ stackView: NSStackView) {
+  stackView.orientation = .vertical
+  stackView.alignment = .leading
+  stackView.spacing = 10
+  stackView.translatesAutoresizingMaskIntoConstraints = false
+}
+
+func configureCommandPanelBluetoothContentStackView(_ stackView: NSStackView) {
+  stackView.orientation = .vertical
+  stackView.alignment = .leading
+  stackView.spacing = 6
+  stackView.translatesAutoresizingMaskIntoConstraints = false
+}
+
+func configureCommandPanelBluetoothRowsStackView(_ stackView: NSStackView) {
+  stackView.orientation = .vertical
+  stackView.alignment = .leading
+  stackView.spacing = 4
+  stackView.translatesAutoresizingMaskIntoConstraints = false
+}
+
+func pinCommandPanelArrangedSubviewToStackWidth(
+  _ view: NSView,
+  in stackView: NSStackView
+) {
+  view.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+}
+
 private enum KeepAwakeAssertionError: Error {
   case creationFailed(type: String, code: IOReturn)
 }
@@ -372,7 +400,7 @@ private final class SuggestionPanelController: NSObject {
   }
 }
 
-private struct CommandPanelBluetoothDevicePayload {
+struct CommandPanelBluetoothDevicePayload {
   let name: String
   let batteryLevel: Int?
   let leftBatteryLevel: Int?
@@ -448,7 +476,7 @@ private struct CommandPanelBluetoothDevicePayload {
   }
 }
 
-private struct CommandPanelPayload {
+struct CommandPanelPayload {
   let title: String
   let statusText: String
   let subtitleText: String
@@ -485,7 +513,6 @@ private struct CommandPanelPayload {
           let keepAwake2HoursLabel = arguments["keepAwake2HoursLabel"] as? String,
           let keepAwakeIndefinitelyLabel = arguments["keepAwakeIndefinitelyLabel"] as? String,
           let cancelKeepAwakeLabel = arguments["cancelKeepAwakeLabel"] as? String,
-          let bluetoothDevicesTitle = arguments["bluetoothDevicesTitle"] as? String,
           let launchAtLoginLabel = arguments["launchAtLoginLabel"] as? String,
           let launchAtLoginEnabled = arguments["launchAtLoginEnabled"] as? Bool,
           let openSettingsLabel = arguments["openSettingsLabel"] as? String,
@@ -508,7 +535,7 @@ private struct CommandPanelPayload {
     self.keepAwake2HoursLabel = keepAwake2HoursLabel
     self.keepAwakeIndefinitelyLabel = keepAwakeIndefinitelyLabel
     self.cancelKeepAwakeLabel = cancelKeepAwakeLabel
-    self.bluetoothDevicesTitle = bluetoothDevicesTitle
+    self.bluetoothDevicesTitle = arguments["bluetoothDevicesTitle"] as? String ?? ""
     self.bluetoothDevices = (arguments["bluetoothDevices"] as? [Any] ?? [])
       .compactMap { $0 as? [String: Any] }
       .compactMap(CommandPanelBluetoothDevicePayload.init(dictionary:))
@@ -637,15 +664,18 @@ private final class CommandPanelController: NSObject {
     rootView.layer?.borderColor = NSColor.separatorColor.cgColor
     rootView.layer?.backgroundColor = NSColor(calibratedWhite: 0.92, alpha: 1).cgColor
 
-    stackView.orientation = .vertical
-    stackView.spacing = 10
-    stackView.translatesAutoresizingMaskIntoConstraints = false
+    configureCommandPanelPrimaryStackView(stackView)
 
-    stackView.addArrangedSubview(makeHeader())
-    stackView.addArrangedSubview(makeKeepAwakeSection())
-    stackView.addArrangedSubview(makeBluetoothSection())
-    stackView.addArrangedSubview(makeLaunchAtLoginRow())
-    stackView.addArrangedSubview(makeFooter())
+    [
+      makeHeader(),
+      makeKeepAwakeSection(),
+      makeBluetoothSection(),
+      makeLaunchAtLoginRow(),
+      makeFooter(),
+    ].forEach { section in
+      stackView.addArrangedSubview(section)
+      pinCommandPanelArrangedSubviewToStackWidth(section, in: stackView)
+    }
 
     rootView.addSubview(stackView)
     NSLayoutConstraint.activate([
@@ -807,21 +837,20 @@ private final class CommandPanelController: NSObject {
     icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
 
     let content = NSStackView()
-    content.orientation = .vertical
-    content.spacing = 6
-    content.alignment = .leading
-    content.translatesAutoresizingMaskIntoConstraints = false
+    configureCommandPanelBluetoothContentStackView(content)
 
     bluetoothTitleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
     bluetoothTitleLabel.textColor = .secondaryLabelColor
 
-    bluetoothRowsStackView.orientation = .vertical
-    bluetoothRowsStackView.spacing = 4
-    bluetoothRowsStackView.alignment = .leading
-    bluetoothRowsStackView.translatesAutoresizingMaskIntoConstraints = false
+    configureCommandPanelBluetoothRowsStackView(bluetoothRowsStackView)
 
     content.addArrangedSubview(bluetoothTitleLabel)
+    pinCommandPanelArrangedSubviewToStackWidth(bluetoothTitleLabel, in: content)
     content.addArrangedSubview(bluetoothRowsStackView)
+    pinCommandPanelArrangedSubviewToStackWidth(
+      bluetoothRowsStackView,
+      in: content
+    )
 
     bluetoothSection.addSubview(icon)
     bluetoothSection.addSubview(content)
@@ -869,10 +898,7 @@ private final class CommandPanelController: NSObject {
       row.addArrangedSubview(nameLabel)
       row.addArrangedSubview(batteryLabel)
       bluetoothRowsStackView.addArrangedSubview(row)
-
-      NSLayoutConstraint.activate([
-        row.widthAnchor.constraint(equalTo: bluetoothRowsStackView.widthAnchor),
-      ])
+      pinCommandPanelArrangedSubviewToStackWidth(row, in: bluetoothRowsStackView)
     }
   }
 

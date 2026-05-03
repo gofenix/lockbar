@@ -4,6 +4,74 @@ import XCTest
 @testable import LockBar
 
 final class RunnerTests: XCTestCase {
+  func testCommandPanelPayloadAllowsMissingBluetoothFields() throws {
+    var arguments = makeCommandPanelArguments()
+    arguments.removeValue(forKey: "bluetoothDevicesTitle")
+    arguments.removeValue(forKey: "bluetoothDevices")
+
+    let payload = try XCTUnwrap(CommandPanelPayload(arguments: arguments))
+
+    XCTAssertEqual(payload.title, "LockBar")
+    XCTAssertEqual(payload.bluetoothDevicesTitle, "")
+    XCTAssertTrue(payload.bluetoothDevices.isEmpty)
+  }
+
+  func testCommandPanelArrangedSubviewsArePinnedToStackWidth() {
+    let primaryStackView = NSStackView()
+    configureCommandPanelPrimaryStackView(primaryStackView)
+    let primaryChildView = NSView()
+    primaryStackView.addArrangedSubview(primaryChildView)
+    pinCommandPanelArrangedSubviewToStackWidth(
+      primaryChildView,
+      in: primaryStackView
+    )
+
+    XCTAssertEqual(primaryStackView.orientation, .vertical)
+    XCTAssertTrue(
+      hasWidthConstraint(
+        on: primaryStackView,
+        first: primaryChildView,
+        second: primaryStackView
+      )
+    )
+
+    let bluetoothContentStackView = NSStackView()
+    configureCommandPanelBluetoothContentStackView(bluetoothContentStackView)
+    let bluetoothContentChildView = NSView()
+    bluetoothContentStackView.addArrangedSubview(bluetoothContentChildView)
+    pinCommandPanelArrangedSubviewToStackWidth(
+      bluetoothContentChildView,
+      in: bluetoothContentStackView
+    )
+
+    XCTAssertEqual(bluetoothContentStackView.orientation, .vertical)
+    XCTAssertTrue(
+      hasWidthConstraint(
+        on: bluetoothContentStackView,
+        first: bluetoothContentChildView,
+        second: bluetoothContentStackView
+      )
+    )
+
+    let bluetoothRowsStackView = NSStackView()
+    configureCommandPanelBluetoothRowsStackView(bluetoothRowsStackView)
+    let bluetoothRowView = NSView()
+    bluetoothRowsStackView.addArrangedSubview(bluetoothRowView)
+    pinCommandPanelArrangedSubviewToStackWidth(
+      bluetoothRowView,
+      in: bluetoothRowsStackView
+    )
+
+    XCTAssertEqual(bluetoothRowsStackView.orientation, .vertical)
+    XCTAssertTrue(
+      hasWidthConstraint(
+        on: bluetoothRowsStackView,
+        first: bluetoothRowView,
+        second: bluetoothRowsStackView
+      )
+    )
+  }
+
   func testAppMenuLocalizerAppliesEnglishTitles() {
     let menu = makeMainMenu()
 
@@ -62,6 +130,30 @@ final class RunnerTests: XCTestCase {
     return menu
   }
 
+  private func makeCommandPanelArguments() -> [String: Any] {
+    [
+      "title": "LockBar",
+      "statusText": "Ready",
+      "subtitleText": "Lock when you step away",
+      "lockNowLabel": "Lock Now",
+      "canLockNow": true,
+      "keepAwakeTitle": "Keep Awake",
+      "keepAwakeSubtitle": "Off",
+      "keepAwakeActive": false,
+      "keepAwake30MinutesLabel": "30m",
+      "keepAwake1HourLabel": "1h",
+      "keepAwake2HoursLabel": "2h",
+      "keepAwakeIndefinitelyLabel": "Always",
+      "cancelKeepAwakeLabel": "Cancel",
+      "bluetoothDevicesTitle": "Bluetooth Devices",
+      "bluetoothDevices": [],
+      "launchAtLoginLabel": "Launch at Login",
+      "launchAtLoginEnabled": false,
+      "openSettingsLabel": "Settings",
+      "quitLabel": "Quit",
+    ]
+  }
+
   private func submenu(itemCount: Int) -> NSMenu {
     let menu = NSMenu(title: "")
     for index in 0..<itemCount {
@@ -74,5 +166,27 @@ final class RunnerTests: XCTestCase {
       )
     }
     return menu
+  }
+
+  private func hasWidthConstraint(
+    on container: NSView,
+    first: NSView,
+    second: NSView
+  ) -> Bool {
+    container.constraints.contains { constraint in
+      guard constraint.firstAttribute == .width,
+            constraint.secondAttribute == .width
+      else {
+        return false
+      }
+
+      let firstMatches =
+        (constraint.firstItem as AnyObject?) === first &&
+        (constraint.secondItem as AnyObject?) === second
+      let secondMatches =
+        (constraint.firstItem as AnyObject?) === second &&
+        (constraint.secondItem as AnyObject?) === first
+      return firstMatches || secondMatches
+    }
   }
 }
