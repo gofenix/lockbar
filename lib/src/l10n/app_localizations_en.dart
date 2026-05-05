@@ -666,6 +666,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiCancelDelayedLockAction => 'Cancel Delayed Lock';
 
   @override
+  String get appearanceAction => 'Appearance';
+
+  @override
+  String get appearanceLightAction => 'Light';
+
+  @override
+  String get appearanceDarkAction => 'Dark';
+
+  @override
+  String get appearanceAutomaticAction => 'Automatic';
+
+  @override
   String get keepAwakeAction => 'Keep Awake…';
 
   @override

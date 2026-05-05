@@ -29,6 +29,10 @@ abstract class LockbarTrayClient {
   Future<void> setTitle(String title);
 
   Future<void> setToolTip(String toolTip);
+
+  Future<void> setContextMenu(Menu menu);
+
+  Future<void> popUpContextMenu();
 }
 
 class SystemLockbarTrayClient implements LockbarTrayClient {
@@ -67,6 +71,16 @@ class SystemLockbarTrayClient implements LockbarTrayClient {
   Future<void> setToolTip(String toolTip) async {
     await trayManager.setToolTip(toolTip);
   }
+
+  @override
+  Future<void> setContextMenu(Menu menu) async {
+    await trayManager.setContextMenu(menu);
+  }
+
+  @override
+  Future<void> popUpContextMenu() async {
+    await trayManager.popUpContextMenu();
+  }
 }
 
 class LockbarDesktopCoordinator with TrayListener, WindowListener {
@@ -88,13 +102,15 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   bool? _lastSuggestionPanelVisible;
   String? _lastSuggestionPanelSignature;
   bool? _lastSuggestionIndicatorVisible;
+  List<BluetoothBatteryDevice> _cachedBluetoothBatteryDevices = const [];
+  Future<List<BluetoothBatteryDevice>>? _bluetoothBatteryRefresh;
+  String? _lastCommandMenuSignature;
+  bool _hasCommandMenu = false;
   StreamSubscription<SuggestionPanelAction>? _panelActionsSubscription;
-  StreamSubscription<CommandPanelAction>? _commandPanelActionsSubscription;
-  bool _commandPanelVisible = false;
-  String? _lastCommandPanelSignature;
 
   static const _settingsWindowSize = Size(520, 560);
   static const _settingsWindowMinSize = Size(460, 500);
+  static const _settingsWindowMaxSize = Size(10000, 10000);
 
   Future<void> start() async {
     if (_started) {
@@ -108,9 +124,6 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     _panelActionsSubscription = platform.suggestionPanelActions.listen(
       _handleSuggestionPanelAction,
     );
-    _commandPanelActionsSubscription = platform.commandPanelActions.listen(
-      _handleCommandPanelAction,
-    );
 
     await _configureTray();
     await _syncTrayTitle(force: true);
@@ -118,6 +131,8 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     await _syncTrayIconAppearance(force: true);
     await _syncSettingsWindow(force: true);
     await _syncSuggestionPanel(force: true);
+    await _syncCommandMenu(force: true);
+    _refreshBluetoothBatteryDevicesInBackground();
   }
 
   void dispose() {
@@ -125,7 +140,6 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       return;
     }
     _panelActionsSubscription?.cancel();
-    _commandPanelActionsSubscription?.cancel();
     controller.removeListener(_handleControllerChanged);
     trayClient.removeListener(this);
     windowManager.removeListener(this);
@@ -160,7 +174,7 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _syncTrayTitle({bool force = false}) async {
-    final nextTitle = buildTrayTitle();
+    final nextTitle = buildStatusItemTitle();
     if (!force && _lastTrayTitle == nextTitle) {
       return;
     }
@@ -169,12 +183,17 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   @visibleForTesting
-  Future<CommandPanelData> buildCommandPanelData() async {
+  Future<CommandPanelData> buildCommandPanelData({
+    bool refreshBluetoothDevices = true,
+  }) async {
     final localizations = localizationsForLocale(controller.effectiveLocale);
     final keepAwakeSession = controller.keepAwakeSession;
     final keepAwakeRemaining = controller.keepAwakeRemaining;
     final canLockNow = controller.permissionState == PermissionState.granted;
-    final bluetoothDevices = await _bluetoothBatteryDevicesForCommandPanel();
+    final appearanceMode = await platform.getAppearanceMode();
+    final bluetoothDevices = refreshBluetoothDevices
+        ? await _refreshBluetoothBatteryDevices()
+        : _cachedBluetoothBatteryDevices;
 
     return CommandPanelData(
       title: 'LockBar',
@@ -201,6 +220,11 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       keepAwake2HoursLabel: '2h',
       keepAwakeIndefinitelyLabel: '\u221e',
       cancelKeepAwakeLabel: localizations.cancelKeepAwakeAction,
+      appearanceTitle: localizations.appearanceAction,
+      appearanceMode: appearanceMode,
+      appearanceLightLabel: localizations.appearanceLightAction,
+      appearanceDarkLabel: localizations.appearanceDarkAction,
+      appearanceAutomaticLabel: localizations.appearanceAutomaticAction,
       bluetoothDevicesTitle: localizations.commandPanelBluetoothDevicesTitle,
       bluetoothDevices: bluetoothDevices,
       launchAtLoginLabel: localizations.launchAtLogin,
@@ -210,14 +234,38 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     );
   }
 
-  Future<List<BluetoothBatteryDevice>>
-  _bluetoothBatteryDevicesForCommandPanel() async {
+  void _refreshBluetoothBatteryDevicesInBackground() {
+    unawaited(_refreshBluetoothBatteryDevices());
+  }
+
+  Future<List<BluetoothBatteryDevice>> _refreshBluetoothBatteryDevices() {
+    final inFlight = _bluetoothBatteryRefresh;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    late final Future<List<BluetoothBatteryDevice>> refresh;
+    refresh = _loadBluetoothBatteryDevices().whenComplete(() {
+      if (identical(_bluetoothBatteryRefresh, refresh)) {
+        _bluetoothBatteryRefresh = null;
+      }
+    });
+    _bluetoothBatteryRefresh = refresh;
+    return refresh;
+  }
+
+  Future<List<BluetoothBatteryDevice>> _loadBluetoothBatteryDevices() async {
     try {
       final devices = await platform.getBluetoothBatteryDevices();
-      return devices.where((device) => device.hasBatteryLevel).toList()
-        ..sort(BluetoothBatteryDevice.compareByName);
+      _cachedBluetoothBatteryDevices =
+          devices.where((device) => device.hasBatteryLevel).toList()
+            ..sort(BluetoothBatteryDevice.compareByName);
+      if (_started) {
+        unawaited(_syncCommandMenu(force: true));
+      }
+      return _cachedBluetoothBatteryDevices;
     } catch (_) {
-      return const [];
+      return _cachedBluetoothBatteryDevices;
     }
   }
 
@@ -269,24 +317,42 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   @visibleForTesting
+  String buildStatusItemTitle() {
+    if (controller.focusSession == null &&
+        controller.keepAwakeSession == null) {
+      return '';
+    }
+    return buildTrayTitle();
+  }
+
+  @visibleForTesting
   Future<void> syncTrayTitleForTesting({bool force = false}) async {
     await _syncTrayTitle(force: force);
   }
 
   @visibleForTesting
-  Future<void> syncCommandPanelForTesting({bool force = false}) async {
-    await _syncCommandPanel(force: force);
+  Future<void> syncCommandMenuForTesting({bool force = false}) async {
+    await _syncCommandMenu(force: force);
+  }
+
+  @visibleForTesting
+  Future<Menu> buildCommandMenuForTesting() async {
+    return _buildCommandMenu();
   }
 
   @visibleForTesting
   Future<void> showCommandPanelForTesting() async {
-    await _showCommandPanel();
+    await _showCommandMenu(refreshBluetoothDevices: true);
   }
 
   @visibleForTesting
   Future<void> handleCommandPanelActionForTesting(
     CommandPanelAction action,
   ) async {
+    await handleCommandPanelAction(action);
+  }
+
+  Future<void> handleCommandPanelAction(CommandPanelAction action) async {
     await _handleCommandPanelAction(action);
   }
 
@@ -294,12 +360,12 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     if (!_started) {
       return;
     }
-    await _syncCommandPanel();
     await _syncTrayTitle();
     await _syncNativeLocale();
     await _syncTrayIconAppearance();
     await _syncSettingsWindow();
     await _syncSuggestionPanel();
+    await _syncCommandMenu();
   }
 
   Future<void> _syncNativeLocale() async {
@@ -326,7 +392,11 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     }
 
     await windowManager.setAlwaysOnTop(false);
+    await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+    await windowManager.setResizable(true);
     await windowManager.setMinimumSize(_settingsWindowMinSize);
+    await windowManager.setMaximumSize(_settingsWindowMaxSize);
+    await windowManager.setBackgroundColor(const Color(0xFFF4F5F7));
     if (!_didPrepareSettingsWindow) {
       await windowManager.setSize(_settingsWindowSize);
       await windowManager.center();
@@ -407,15 +477,8 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
   }
 
   Future<void> _handleCommandPanelAction(CommandPanelAction action) async {
-    if (action == CommandPanelAction.hide) {
-      _commandPanelVisible = false;
-      _lastCommandPanelSignature = null;
-      return;
-    }
-
     switch (action) {
       case CommandPanelAction.lockNow:
-        await _hideCommandPanel();
         await controller.lockNowFromSettings();
         break;
       case CommandPanelAction.keepAwake30Minutes:
@@ -433,15 +496,22 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
       case CommandPanelAction.cancelKeepAwake:
         await controller.cancelKeepAwakeSession();
         break;
+      case CommandPanelAction.setAppearanceLight:
+        await _setAppearanceMode(AppearanceMode.light);
+        break;
+      case CommandPanelAction.setAppearanceDark:
+        await _setAppearanceMode(AppearanceMode.dark);
+        break;
+      case CommandPanelAction.setAppearanceAutomatic:
+        await _setAppearanceMode(AppearanceMode.automatic);
+        break;
       case CommandPanelAction.toggleLaunchAtLogin:
         await controller.setLaunchAtStartup(!controller.launchAtStartupEnabled);
         break;
       case CommandPanelAction.openSettings:
-        await _hideCommandPanel();
         controller.openSettingsWindow();
         break;
       case CommandPanelAction.quit:
-        await _hideCommandPanel();
         await _quitApp();
         break;
       case CommandPanelAction.hide:
@@ -449,10 +519,14 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
     }
   }
 
-  Future<void> _hideCommandPanel() async {
-    _commandPanelVisible = false;
-    _lastCommandPanelSignature = null;
-    await platform.hideCommandPanel();
+  Future<void> _setAppearanceMode(AppearanceMode mode) async {
+    try {
+      await platform.setAppearanceMode(mode);
+    } catch (_) {
+      // Keep the menu responsive if macOS Automation permission is denied.
+    } finally {
+      await _syncCommandMenu(force: true);
+    }
   }
 
   @override
@@ -462,26 +536,194 @@ class LockbarDesktopCoordinator with TrayListener, WindowListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    unawaited(_showCommandPanel());
+    unawaited(_showCommandMenu());
   }
 
-  Future<void> _showCommandPanel() async {
-    final data = await buildCommandPanelData();
-    _commandPanelVisible = true;
-    _lastCommandPanelSignature = data.signature;
-    await platform.showCommandPanel(data);
+  @override
+  void onTrayMenuItemClick(MenuItem menuItem) {
+    final action = CommandPanelAction.fromStorageKey(menuItem.key);
+    if (action == CommandPanelAction.hide) {
+      return;
+    }
+    unawaited(_handleCommandPanelAction(action));
   }
 
-  Future<void> _syncCommandPanel({bool force = false}) async {
-    if (!_commandPanelVisible) {
+  Future<void> _showCommandMenu({bool refreshBluetoothDevices = false}) async {
+    if (refreshBluetoothDevices || !_hasCommandMenu) {
+      await _syncCommandMenu(
+        force: refreshBluetoothDevices || !_hasCommandMenu,
+        refreshBluetoothDevices: refreshBluetoothDevices,
+      );
+    } else {
+      _refreshBluetoothBatteryDevicesInBackground();
+    }
+    await trayClient.popUpContextMenu();
+  }
+
+  Future<void> _syncCommandMenu({
+    bool force = false,
+    bool refreshBluetoothDevices = false,
+  }) async {
+    final data = await buildCommandPanelData(
+      refreshBluetoothDevices: refreshBluetoothDevices,
+    );
+    if (!force && _lastCommandMenuSignature == data.signature) {
       return;
     }
-    final data = await buildCommandPanelData();
-    if (!force && _lastCommandPanelSignature == data.signature) {
-      return;
+    await trayClient.setContextMenu(_buildCommandMenuFromData(data));
+    _lastCommandMenuSignature = data.signature;
+    _hasCommandMenu = true;
+  }
+
+  Future<Menu> _buildCommandMenu({bool refreshBluetoothDevices = true}) async {
+    final data = await buildCommandPanelData(
+      refreshBluetoothDevices: refreshBluetoothDevices,
+    );
+    return _buildCommandMenuFromData(data);
+  }
+
+  Menu _buildCommandMenuFromData(CommandPanelData data) {
+    final localizations = localizationsForLocale(controller.effectiveLocale);
+    final items = <MenuItem>[
+      MenuItem(label: data.statusText, disabled: true),
+      MenuItem.separator(),
+      MenuItem(
+        key: CommandPanelAction.lockNow.storageKey,
+        label: data.lockNowLabel,
+        disabled: !data.canLockNow,
+      ),
+      MenuItem.submenu(
+        label: data.keepAwakeTitle,
+        submenu: Menu(
+          items: [
+            _keepAwakePresetItem(
+              action: CommandPanelAction.keepAwake30Minutes,
+              label: localizations.keepAwakeFor30MinutesAction,
+              selected: data.keepAwakePreset == KeepAwakePreset.thirtyMinutes,
+            ),
+            _keepAwakePresetItem(
+              action: CommandPanelAction.keepAwake1Hour,
+              label: localizations.keepAwakeForOneHourAction,
+              selected: data.keepAwakePreset == KeepAwakePreset.oneHour,
+            ),
+            _keepAwakePresetItem(
+              action: CommandPanelAction.keepAwake2Hours,
+              label: localizations.keepAwakeForTwoHoursAction,
+              selected: data.keepAwakePreset == KeepAwakePreset.twoHours,
+            ),
+            _keepAwakePresetItem(
+              action: CommandPanelAction.keepAwakeIndefinitely,
+              label: localizations.keepAwakeIndefinitelyAction,
+              selected: data.keepAwakePreset == KeepAwakePreset.indefinite,
+            ),
+            MenuItem.separator(),
+            MenuItem(
+              key: CommandPanelAction.cancelKeepAwake.storageKey,
+              label: data.cancelKeepAwakeLabel,
+              disabled: !data.keepAwakeActive,
+            ),
+          ],
+        ),
+      ),
+      MenuItem.submenu(
+        label: data.appearanceTitle,
+        submenu: Menu(
+          items: [
+            _appearanceModeItem(
+              action: CommandPanelAction.setAppearanceLight,
+              label: data.appearanceLightLabel,
+              selected: data.appearanceMode == AppearanceMode.light,
+            ),
+            _appearanceModeItem(
+              action: CommandPanelAction.setAppearanceDark,
+              label: data.appearanceDarkLabel,
+              selected: data.appearanceMode == AppearanceMode.dark,
+            ),
+            _appearanceModeItem(
+              action: CommandPanelAction.setAppearanceAutomatic,
+              label: data.appearanceAutomaticLabel,
+              selected: data.appearanceMode == AppearanceMode.automatic,
+            ),
+          ],
+        ),
+      ),
+      MenuItem.checkbox(
+        key: CommandPanelAction.toggleLaunchAtLogin.storageKey,
+        label: data.launchAtLoginLabel,
+        checked: data.launchAtLoginEnabled,
+      ),
+    ];
+
+    if (data.bluetoothDevices.isNotEmpty) {
+      items.add(MenuItem.separator());
+      items.add(
+        MenuItem.submenu(
+          label: data.bluetoothDevicesTitle,
+          submenu: Menu(
+            items: data.bluetoothDevices
+                .map(
+                  (device) => MenuItem(
+                    label: '${device.name}  ${_batterySummary(device)}',
+                    disabled: true,
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ),
+      );
     }
-    _lastCommandPanelSignature = data.signature;
-    await platform.updateCommandPanel(data);
+
+    items.addAll([
+      MenuItem.separator(),
+      MenuItem(
+        key: CommandPanelAction.openSettings.storageKey,
+        label: data.openSettingsLabel,
+      ),
+      MenuItem(key: CommandPanelAction.quit.storageKey, label: data.quitLabel),
+    ]);
+
+    return Menu(items: items);
+  }
+
+  MenuItem _appearanceModeItem({
+    required CommandPanelAction action,
+    required String label,
+    required bool selected,
+  }) {
+    return MenuItem.checkbox(
+      key: action.storageKey,
+      label: label,
+      checked: selected,
+    );
+  }
+
+  MenuItem _keepAwakePresetItem({
+    required CommandPanelAction action,
+    required String label,
+    required bool selected,
+  }) {
+    return MenuItem.checkbox(
+      key: action.storageKey,
+      label: label,
+      checked: selected,
+    );
+  }
+
+  String _batterySummary(BluetoothBatteryDevice device) {
+    final parts = <String>[];
+    if (device.leftBatteryLevel != null) {
+      parts.add('L ${device.leftBatteryLevel}%');
+    }
+    if (device.rightBatteryLevel != null) {
+      parts.add('R ${device.rightBatteryLevel}%');
+    }
+    if (device.caseBatteryLevel != null) {
+      parts.add('Case ${device.caseBatteryLevel}%');
+    }
+    if (parts.isNotEmpty) {
+      return parts.join(' / ');
+    }
+    return '${device.batteryLevel}%';
   }
 
   @override

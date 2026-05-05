@@ -1257,6 +1257,30 @@ abstract class AppLocalizations {
   /// **'Cancel Delayed Lock'**
   String get aiCancelDelayedLockAction;
 
+  /// No description provided for @appearanceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearanceAction;
+
+  /// No description provided for @appearanceLightAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get appearanceLightAction;
+
+  /// No description provided for @appearanceDarkAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get appearanceDarkAction;
+
+  /// No description provided for @appearanceAutomaticAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get appearanceAutomaticAction;
+
   /// No description provided for @keepAwakeAction.
   ///
   /// In en, this message translates to:

@@ -1,6 +1,7 @@
-import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'dart:async';
+import 'dart:ui';
+
+import 'package:flutter/services.dart';
 
 import '../models/ai_models.dart';
 import '../models/command_panel_models.dart';
@@ -20,6 +21,10 @@ abstract class LockbarPlatform {
   Future<void> quitApp();
 
   Future<AppInfo> getAppInfo();
+
+  Future<AppearanceMode> getAppearanceMode();
+
+  Future<void> setAppearanceMode(AppearanceMode mode);
 
   Future<void> setNativeLocale(Locale locale);
 
@@ -48,23 +53,12 @@ abstract class LockbarPlatform {
   Future<void> updateSuggestionPanel(SuggestionPanelData data);
 
   Future<void> hideSuggestionPanel();
-
-  Stream<CommandPanelAction> get commandPanelActions;
-
-  Future<void> showCommandPanel(CommandPanelData data);
-
-  Future<void> updateCommandPanel(CommandPanelData data);
-
-  Future<void> hideCommandPanel();
 }
 
 class MethodChannelLockbarPlatform implements LockbarPlatform {
   static const MethodChannel _channel = MethodChannel('lockbar/macos');
   static final StreamController<SuggestionPanelAction> _panelActionsController =
       StreamController<SuggestionPanelAction>.broadcast();
-  static final StreamController<CommandPanelAction>
-  _commandPanelActionsController =
-      StreamController<CommandPanelAction>.broadcast();
   static bool _handlerInitialized = false;
 
   MethodChannelLockbarPlatform() {
@@ -79,11 +73,6 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
       switch (call.method) {
         case 'suggestionPanelAction':
           _panelActionsController.add(_parseSuggestionPanelAction(rawAction));
-          break;
-        case 'commandPanelAction':
-          _commandPanelActionsController.add(
-            CommandPanelAction.fromStorageKey(rawAction),
-          );
           break;
         default:
           throw PlatformException(
@@ -143,6 +132,19 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
       version: result?['version'] as String? ?? '1.0.0',
       buildNumber: result?['buildNumber'] as String? ?? '1',
     );
+  }
+
+  @override
+  Future<AppearanceMode> getAppearanceMode() async {
+    final rawMode = await _channel.invokeMethod<String>('getAppearanceMode');
+    return _parseAppearanceMode(rawMode);
+  }
+
+  @override
+  Future<void> setAppearanceMode(AppearanceMode mode) {
+    return _channel.invokeMethod<void>('setAppearanceMode', {
+      'mode': mode.storageKey,
+    });
   }
 
   @override
@@ -242,25 +244,6 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
     return _channel.invokeMethod<void>('hideSuggestionPanel');
   }
 
-  @override
-  Stream<CommandPanelAction> get commandPanelActions =>
-      _commandPanelActionsController.stream;
-
-  @override
-  Future<void> showCommandPanel(CommandPanelData data) {
-    return _channel.invokeMethod<void>('showCommandPanel', data.toMap());
-  }
-
-  @override
-  Future<void> updateCommandPanel(CommandPanelData data) {
-    return _channel.invokeMethod<void>('updateCommandPanel', data.toMap());
-  }
-
-  @override
-  Future<void> hideCommandPanel() {
-    return _channel.invokeMethod<void>('hideCommandPanel');
-  }
-
   PermissionState _parsePermissionState(String? rawState) {
     switch (rawState) {
       case 'granted':
@@ -274,6 +257,24 @@ class MethodChannelLockbarPlatform implements LockbarPlatform {
         throw PlatformException(
           code: 'invalid_permission_state',
           message: 'Unsupported permission state: $rawState',
+        );
+    }
+  }
+
+  AppearanceMode _parseAppearanceMode(String? rawMode) {
+    switch (rawMode) {
+      case 'light':
+        return AppearanceMode.light;
+      case 'dark':
+        return AppearanceMode.dark;
+      case 'automatic':
+        return AppearanceMode.automatic;
+      case null:
+        return AppearanceMode.light;
+      default:
+        throw PlatformException(
+          code: 'invalid_appearance_mode',
+          message: 'Unsupported appearance mode: $rawMode',
         );
     }
   }

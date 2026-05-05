@@ -33,6 +33,8 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>LockBar uses System Events only when you choose a menu command to change the macOS appearance mode.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>LockBar can read nearby calendar titles and times when you explicitly enable calendar suggestions.</string>
 	<key>NSMainNibFile</key>

@@ -7,6 +7,9 @@ enum CommandPanelAction {
   keepAwake2Hours('keepAwake2Hours'),
   keepAwakeIndefinitely('keepAwakeIndefinitely'),
   cancelKeepAwake('cancelKeepAwake'),
+  setAppearanceLight('setAppearanceLight'),
+  setAppearanceDark('setAppearanceDark'),
+  setAppearanceAutomatic('setAppearanceAutomatic'),
   toggleLaunchAtLogin('toggleLaunchAtLogin'),
   openSettings('openSettings'),
   quit('quit'),
@@ -23,6 +26,25 @@ enum CommandPanelAction {
       }
     }
     return CommandPanelAction.hide;
+  }
+}
+
+enum AppearanceMode {
+  light('light'),
+  dark('dark'),
+  automatic('automatic');
+
+  const AppearanceMode(this.storageKey);
+
+  final String storageKey;
+
+  static AppearanceMode fromStorageKey(String? value) {
+    for (final mode in values) {
+      if (mode.storageKey == value) {
+        return mode;
+      }
+    }
+    return AppearanceMode.light;
   }
 }
 
@@ -118,6 +140,11 @@ class CommandPanelData {
     required this.keepAwake2HoursLabel,
     required this.keepAwakeIndefinitelyLabel,
     required this.cancelKeepAwakeLabel,
+    required this.appearanceTitle,
+    required this.appearanceMode,
+    required this.appearanceLightLabel,
+    required this.appearanceDarkLabel,
+    required this.appearanceAutomaticLabel,
     required this.bluetoothDevicesTitle,
     required this.bluetoothDevices,
     required this.launchAtLoginLabel,
@@ -140,6 +167,11 @@ class CommandPanelData {
   final String keepAwake2HoursLabel;
   final String keepAwakeIndefinitelyLabel;
   final String cancelKeepAwakeLabel;
+  final String appearanceTitle;
+  final AppearanceMode appearanceMode;
+  final String appearanceLightLabel;
+  final String appearanceDarkLabel;
+  final String appearanceAutomaticLabel;
   final String bluetoothDevicesTitle;
   final List<BluetoothBatteryDevice> bluetoothDevices;
   final String launchAtLoginLabel;
@@ -162,6 +194,11 @@ class CommandPanelData {
     'keepAwake2HoursLabel': keepAwake2HoursLabel,
     'keepAwakeIndefinitelyLabel': keepAwakeIndefinitelyLabel,
     'cancelKeepAwakeLabel': cancelKeepAwakeLabel,
+    'appearanceTitle': appearanceTitle,
+    'appearanceMode': appearanceMode.storageKey,
+    'appearanceLightLabel': appearanceLightLabel,
+    'appearanceDarkLabel': appearanceDarkLabel,
+    'appearanceAutomaticLabel': appearanceAutomaticLabel,
     'bluetoothDevicesTitle': bluetoothDevicesTitle,
     'bluetoothDevices': bluetoothDevices
         .map((device) => device.toMap())
@@ -187,6 +224,11 @@ class CommandPanelData {
     keepAwake2HoursLabel,
     keepAwakeIndefinitelyLabel,
     cancelKeepAwakeLabel,
+    appearanceTitle,
+    appearanceMode.storageKey,
+    appearanceLightLabel,
+    appearanceDarkLabel,
+    appearanceAutomaticLabel,
     bluetoothDevicesTitle,
     bluetoothDevices.map((device) => device.signature).join(','),
     launchAtLoginLabel,

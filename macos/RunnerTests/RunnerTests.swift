@@ -4,72 +4,125 @@ import XCTest
 @testable import LockBar
 
 final class RunnerTests: XCTestCase {
-  func testCommandPanelPayloadAllowsMissingBluetoothFields() throws {
-    var arguments = makeCommandPanelArguments()
-    arguments.removeValue(forKey: "bluetoothDevicesTitle")
-    arguments.removeValue(forKey: "bluetoothDevices")
-
-    let payload = try XCTUnwrap(CommandPanelPayload(arguments: arguments))
-
-    XCTAssertEqual(payload.title, "LockBar")
-    XCTAssertEqual(payload.bluetoothDevicesTitle, "")
-    XCTAssertTrue(payload.bluetoothDevices.isEmpty)
+  func testAppearanceModeFromPreferencesPrefersAutomatic() {
+    XCTAssertEqual(
+      appearanceModeFromPreferences(
+        automaticSwitches: true,
+        interfaceStyle: nil
+      ),
+      "automatic"
+    )
+    XCTAssertEqual(
+      appearanceModeFromPreferences(
+        automaticSwitches: true,
+        interfaceStyle: "Dark"
+      ),
+      "automatic"
+    )
   }
 
-  func testCommandPanelArrangedSubviewsArePinnedToStackWidth() {
-    let primaryStackView = NSStackView()
-    configureCommandPanelPrimaryStackView(primaryStackView)
-    let primaryChildView = NSView()
-    primaryStackView.addArrangedSubview(primaryChildView)
-    pinCommandPanelArrangedSubviewToStackWidth(
-      primaryChildView,
-      in: primaryStackView
+  func testAppearanceModeFromPreferencesFallsBackToManualStyle() {
+    XCTAssertEqual(
+      appearanceModeFromPreferences(
+        automaticSwitches: false,
+        interfaceStyle: "Dark"
+      ),
+      "dark"
     )
+    XCTAssertEqual(
+      appearanceModeFromPreferences(
+        automaticSwitches: nil,
+        interfaceStyle: nil
+      ),
+      "light"
+    )
+  }
 
-    XCTAssertEqual(primaryStackView.orientation, .vertical)
-    XCTAssertTrue(
-      hasWidthConstraint(
-        on: primaryStackView,
-        first: primaryChildView,
-        second: primaryStackView
-      )
-    )
+  func testSystemProfilerBluetoothParserReadsConnectedMouseMainBattery() throws {
+    let json = """
+    {
+      "SPBluetoothDataType": [
+        {
+          "device_connected": [
+            {
+              "MX Master 3": {
+                "device_address": "E7:C6:C5:25:73:59",
+                "device_batteryLevelMain": "100%",
+                "device_minorType": "Mouse"
+              }
+            }
+          ],
+          "device_not_connected": [
+            {
+              "Fenix AirPods": {
+                "device_address": "F8:4D:89:55:A6:3A",
+                "device_batteryLevelMain": "77%"
+              }
+            }
+          ]
+        }
+      ]
+    }
+    """.data(using: .utf8)!
 
-    let bluetoothContentStackView = NSStackView()
-    configureCommandPanelBluetoothContentStackView(bluetoothContentStackView)
-    let bluetoothContentChildView = NSView()
-    bluetoothContentStackView.addArrangedSubview(bluetoothContentChildView)
-    pinCommandPanelArrangedSubviewToStackWidth(
-      bluetoothContentChildView,
-      in: bluetoothContentStackView
-    )
+    let records = bluetoothBatteryRecordsFromSystemProfilerJSON(json)
 
-    XCTAssertEqual(bluetoothContentStackView.orientation, .vertical)
-    XCTAssertTrue(
-      hasWidthConstraint(
-        on: bluetoothContentStackView,
-        first: bluetoothContentChildView,
-        second: bluetoothContentStackView
-      )
-    )
+    XCTAssertEqual(records.count, 1)
+    XCTAssertTrue(records[0].names.contains("mx master 3"))
+    XCTAssertTrue(records[0].addresses.contains("e7c6c5257359"))
+    XCTAssertEqual(records[0].batteryLevel, 100)
+  }
 
-    let bluetoothRowsStackView = NSStackView()
-    configureCommandPanelBluetoothRowsStackView(bluetoothRowsStackView)
-    let bluetoothRowView = NSView()
-    bluetoothRowsStackView.addArrangedSubview(bluetoothRowView)
-    pinCommandPanelArrangedSubviewToStackWidth(
-      bluetoothRowView,
-      in: bluetoothRowsStackView
-    )
+  func testSystemProfilerBluetoothParserReadsEarbudComponentBatteries() throws {
+    let json = """
+    {
+      "SPBluetoothDataType": [
+        {
+          "device_connected": [
+            {
+              "AirPods Pro": {
+                "device_address": "AA:BB:CC:DD:EE:FF",
+                "device_batteryLevelLeft": "76%",
+                "device_batteryLevelRight": "71%",
+                "device_batteryLevelCase": "54%"
+              }
+            }
+          ]
+        }
+      ]
+    }
+    """.data(using: .utf8)!
 
-    XCTAssertEqual(bluetoothRowsStackView.orientation, .vertical)
-    XCTAssertTrue(
-      hasWidthConstraint(
-        on: bluetoothRowsStackView,
-        first: bluetoothRowView,
-        second: bluetoothRowsStackView
-      )
-    )
+    let records = bluetoothBatteryRecordsFromSystemProfilerJSON(json)
+
+    XCTAssertEqual(records.count, 1)
+    XCTAssertEqual(records[0].leftBatteryLevel, 76)
+    XCTAssertEqual(records[0].rightBatteryLevel, 71)
+    XCTAssertEqual(records[0].caseBatteryLevel, 54)
+  }
+
+  func testSystemProfilerBluetoothParserIgnoresDisconnectedDevices() throws {
+    let json = """
+    {
+      "SPBluetoothDataType": [
+        {
+          "device_connected": [],
+          "device_not_connected": [
+            {
+              "Keyboard": {
+                "device_address": "11:22:33:44:55:66",
+                "device_batteryLevelMain": "88%"
+              }
+            }
+          ]
+        }
+      ]
+    }
+    """.data(using: .utf8)!
+
+    let records = bluetoothBatteryRecordsFromSystemProfilerJSON(json)
+
+    XCTAssertTrue(records.isEmpty)
   }
 
   func testAppMenuLocalizerAppliesEnglishTitles() {
@@ -130,30 +183,6 @@ final class RunnerTests: XCTestCase {
     return menu
   }
 
-  private func makeCommandPanelArguments() -> [String: Any] {
-    [
-      "title": "LockBar",
-      "statusText": "Ready",
-      "subtitleText": "Lock when you step away",
-      "lockNowLabel": "Lock Now",
-      "canLockNow": true,
-      "keepAwakeTitle": "Keep Awake",
-      "keepAwakeSubtitle": "Off",
-      "keepAwakeActive": false,
-      "keepAwake30MinutesLabel": "30m",
-      "keepAwake1HourLabel": "1h",
-      "keepAwake2HoursLabel": "2h",
-      "keepAwakeIndefinitelyLabel": "Always",
-      "cancelKeepAwakeLabel": "Cancel",
-      "bluetoothDevicesTitle": "Bluetooth Devices",
-      "bluetoothDevices": [],
-      "launchAtLoginLabel": "Launch at Login",
-      "launchAtLoginEnabled": false,
-      "openSettingsLabel": "Settings",
-      "quitLabel": "Quit",
-    ]
-  }
-
   private func submenu(itemCount: Int) -> NSMenu {
     let menu = NSMenu(title: "")
     for index in 0..<itemCount {
@@ -166,27 +195,5 @@ final class RunnerTests: XCTestCase {
       )
     }
     return menu
-  }
-
-  private func hasWidthConstraint(
-    on container: NSView,
-    first: NSView,
-    second: NSView
-  ) -> Bool {
-    container.constraints.contains { constraint in
-      guard constraint.firstAttribute == .width,
-            constraint.secondAttribute == .width
-      else {
-        return false
-      }
-
-      let firstMatches =
-        (constraint.firstItem as AnyObject?) === first &&
-        (constraint.secondItem as AnyObject?) === second
-      let secondMatches =
-        (constraint.firstItem as AnyObject?) === second &&
-        (constraint.secondItem as AnyObject?) === first
-      return firstMatches || secondMatches
-    }
   }
 }

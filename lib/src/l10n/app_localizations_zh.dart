@@ -632,6 +632,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aiCancelDelayedLockAction => '取消延时锁屏';
 
   @override
+  String get appearanceAction => '外观';
+
+  @override
+  String get appearanceLightAction => '亮色';
+
+  @override
+  String get appearanceDarkAction => '暗色';
+
+  @override
+  String get appearanceAutomaticAction => '自动';
+
+  @override
   String get keepAwakeAction => '保持亮屏…';
 
   @override
@@ -1537,6 +1549,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get aiCancelDelayedLockAction => '取消延时锁屏';
+
+  @override
+  String get appearanceAction => '外观';
+
+  @override
+  String get appearanceLightAction => '亮色';
+
+  @override
+  String get appearanceDarkAction => '暗色';
+
+  @override
+  String get appearanceAutomaticAction => '自动';
 
   @override
   String get keepAwakeAction => '保持亮屏…';

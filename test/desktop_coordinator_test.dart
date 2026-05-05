@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lockbar/src/desktop_coordinator.dart';
@@ -72,6 +74,59 @@ void main() {
       expect(data.keepAwake1HourLabel, '1h');
       expect(data.keepAwake2HoursLabel, '2h');
       expect(data.keepAwakeIndefinitelyLabel, '\u221e');
+    },
+  );
+
+  test(
+    'command panel shows three appearance options and current mode',
+    () async {
+      final trayClient = FakeTrayClient();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted
+        ..appearanceMode = AppearanceMode.automatic;
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+
+      final data = await coordinator.buildCommandPanelData();
+      await coordinator.syncCommandMenuForTesting(force: true);
+
+      expect(data.appearanceTitle, 'Appearance');
+      expect(data.appearanceMode, AppearanceMode.automatic);
+      expect(data.appearanceLightLabel, 'Light');
+      expect(data.appearanceDarkLabel, 'Dark');
+      expect(data.appearanceAutomaticLabel, 'Automatic');
+      expect(
+        trayClient.contextMenu
+            ?.getMenuItem(CommandPanelAction.setAppearanceLight.storageKey)
+            ?.checked,
+        isFalse,
+      );
+      expect(
+        trayClient.contextMenu
+            ?.getMenuItem(CommandPanelAction.setAppearanceDark.storageKey)
+            ?.checked,
+        isFalse,
+      );
+      expect(
+        trayClient.contextMenu
+            ?.getMenuItem(CommandPanelAction.setAppearanceAutomatic.storageKey)
+            ?.checked,
+        isTrue,
+      );
     },
   );
 
@@ -195,33 +250,37 @@ void main() {
     expect(trayClient.title, 'Focus 30:00');
   });
 
-  test('tray title falls back to awake and ready states', () async {
-    final trayClient = FakeTrayClient();
-    final controller = LockbarController(
-      platform: FakeLockbarPlatform(),
-      launchAtStartupService: FakeLaunchAtStartupService(),
-      localePreferencesService: FakeLocalePreferencesService(),
-      aiMemoryService: FakeAiMemoryService(),
-      aiInferenceClient: FakeAiInferenceClient(),
-      aiContextCollector: FakeAiContextCollector(),
-      initialSystemLocale: const Locale('en'),
-      now: () => DateTime(2026, 4, 5, 13, 0, 0),
-    );
-    final coordinator = LockbarDesktopCoordinator(
-      controller: controller,
-      platform: controller.platform,
-      trayClient: trayClient,
-    );
+  test(
+    'tray title hides idle ready state and shows active awake state',
+    () async {
+      final trayClient = FakeTrayClient();
+      final controller = LockbarController(
+        platform: FakeLockbarPlatform(),
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+        now: () => DateTime(2026, 4, 5, 13, 0, 0),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
 
-    await controller.initialize();
+      await controller.initialize();
 
-    await coordinator.syncTrayTitleForTesting(force: true);
-    expect(trayClient.title, 'Ready');
+      await coordinator.syncTrayTitleForTesting(force: true);
+      expect(trayClient.title, '');
+      expect(coordinator.buildTrayTitle(), 'Ready');
 
-    await controller.startKeepAwakeIndefinitely();
-    await coordinator.syncTrayTitleForTesting(force: true);
-    expect(trayClient.title, 'Awake');
-  });
+      await controller.startKeepAwakeIndefinitely();
+      await coordinator.syncTrayTitleForTesting(force: true);
+      expect(trayClient.title, 'Awake');
+    },
+  );
 
   test('tray title localizes to Chinese', () async {
     final trayClient = FakeTrayClient();
@@ -248,43 +307,8 @@ void main() {
     expect(trayClient.title, '专注 25:00');
   });
 
-  test('command panel sync refreshes countdown while visible', () async {
-    var now = DateTime(2026, 4, 5, 13, 0, 0);
-    final trayClient = FakeTrayClient();
-    final platform = FakeLockbarPlatform()
-      ..permissionState = PermissionState.granted;
-    final controller = LockbarController(
-      platform: platform,
-      launchAtStartupService: FakeLaunchAtStartupService(),
-      localePreferencesService: FakeLocalePreferencesService(),
-      aiMemoryService: FakeAiMemoryService(),
-      aiInferenceClient: FakeAiInferenceClient(),
-      aiContextCollector: FakeAiContextCollector(),
-      initialSystemLocale: const Locale('en'),
-      now: () => now,
-    );
-    final coordinator = LockbarDesktopCoordinator(
-      controller: controller,
-      platform: controller.platform,
-      trayClient: trayClient,
-    );
-
-    await controller.initialize();
-    await controller.startKeepAwakeSession(const Duration(minutes: 30));
-    await coordinator.showCommandPanelForTesting();
-
-    expect(platform.showCommandPanelCalls, 1);
-    expect(platform.lastCommandPanelData?.statusText, 'Awake 30:00');
-
-    now = now.add(const Duration(minutes: 10));
-    await coordinator.syncCommandPanelForTesting();
-
-    expect(platform.updateCommandPanelCalls, 1);
-    expect(platform.lastCommandPanelData?.statusText, 'Awake 20:00');
-  });
-
   test(
-    'right click shows command panel without opening native context menu',
+    'native command menu rebuild refreshes countdown before opening',
     () async {
       var now = DateTime(2026, 4, 5, 13, 0, 0);
       final trayClient = FakeTrayClient();
@@ -310,14 +334,104 @@ void main() {
       await controller.startKeepAwakeSession(const Duration(minutes: 30));
       await coordinator.showCommandPanelForTesting();
 
-      expect(platform.showCommandPanelCalls, 1);
-      expect(platform.lastCommandPanelData?.statusText, 'Awake 30:00');
+      expect(trayClient.contextMenu?.items?.first.label, 'Awake 30:00');
 
       now = now.add(const Duration(minutes: 10));
       await coordinator.showCommandPanelForTesting();
 
-      expect(platform.showCommandPanelCalls, 2);
-      expect(platform.lastCommandPanelData?.statusText, 'Awake 20:00');
+      expect(trayClient.setContextMenuCalls, 2);
+      expect(trayClient.popUpContextMenuCalls, 2);
+      expect(trayClient.contextMenu?.items?.first.label, 'Awake 20:00');
+    },
+  );
+
+  test('right click opens the native context menu', () async {
+    final trayClient = FakeTrayClient();
+    final platform = FakeLockbarPlatform()
+      ..permissionState = PermissionState.granted;
+    final controller = LockbarController(
+      platform: platform,
+      launchAtStartupService: FakeLaunchAtStartupService(),
+      localePreferencesService: FakeLocalePreferencesService(),
+      aiMemoryService: FakeAiMemoryService(),
+      aiInferenceClient: FakeAiInferenceClient(),
+      aiContextCollector: FakeAiContextCollector(),
+      initialSystemLocale: const Locale('en'),
+      now: () => DateTime(2026, 4, 5, 13, 0, 0),
+    );
+    final coordinator = LockbarDesktopCoordinator(
+      controller: controller,
+      platform: controller.platform,
+      trayClient: trayClient,
+    );
+
+    await controller.initialize();
+    await controller.startKeepAwakeSession(const Duration(minutes: 30));
+    await coordinator.syncCommandMenuForTesting(force: true);
+    coordinator.onTrayIconRightMouseDown();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(trayClient.setContextMenuCalls, 1);
+    expect(trayClient.popUpContextMenuCalls, 1);
+    expect(trayClient.contextMenu?.items?.first.label, 'Awake 30:00');
+    expect(
+      trayClient.contextMenu
+          ?.getMenuItem(CommandPanelAction.keepAwake30Minutes.storageKey)
+          ?.checked,
+      isTrue,
+    );
+  });
+
+  test(
+    'right click opens the native context menu without accessibility permission or bluetooth wait',
+    () async {
+      final trayClient = FakeTrayClient();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.denied
+        ..bluetoothBatteryDevicesCompleter =
+            Completer<List<BluetoothBatteryDevice>>();
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+      await coordinator.syncCommandMenuForTesting(force: true);
+      coordinator.onTrayIconRightMouseDown();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(platform.getBluetoothBatteryDevicesCalls, 1);
+      expect(trayClient.setContextMenuCalls, 1);
+      expect(trayClient.popUpContextMenuCalls, 1);
+      expect(
+        trayClient.contextMenu?.items?.first.label,
+        'Accessibility is still off',
+      );
+
+      platform.bluetoothBatteryDevicesCompleter!.complete([
+        const BluetoothBatteryDevice(name: 'MX Master 3', batteryLevel: 100),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      await coordinator.syncCommandMenuForTesting(force: true);
+
+      coordinator.onTrayIconRightMouseDown();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(trayClient.setContextMenuCalls, 2);
+      expect(
+        trayClient.contextMenu?.toJson().toString(),
+        contains('MX Master 3  100%'),
+      );
     },
   );
 
@@ -326,9 +440,10 @@ void main() {
     () async {
       final trayClient = FakeTrayClient();
       final launchAtStartup = FakeLaunchAtStartupService();
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted;
       final controller = LockbarController(
-        platform: FakeLockbarPlatform()
-          ..permissionState = PermissionState.granted,
+        platform: platform,
         launchAtStartupService: launchAtStartup,
         localePreferencesService: FakeLocalePreferencesService(),
         aiMemoryService: FakeAiMemoryService(),
@@ -360,6 +475,17 @@ void main() {
       );
       expect(controller.launchAtStartupEnabled, isTrue);
       expect(launchAtStartup.setEnabledCalls, 1);
+
+      await coordinator.handleCommandPanelActionForTesting(
+        CommandPanelAction.setAppearanceDark,
+      );
+      expect(platform.appearanceMode, AppearanceMode.dark);
+
+      await coordinator.handleCommandPanelActionForTesting(
+        CommandPanelAction.setAppearanceAutomatic,
+      );
+      expect(platform.appearanceMode, AppearanceMode.automatic);
+      expect(platform.setAppearanceModeCalls, 2);
     },
   );
 
@@ -450,45 +576,47 @@ void main() {
     },
   );
 
-  test('command panel sync updates when bluetooth battery changes', () async {
-    final platform = FakeLockbarPlatform()
-      ..permissionState = PermissionState.granted
-      ..bluetoothBatteryDevices = const [
-        BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 82),
+  test(
+    'native command menu reflects bluetooth battery changes when reopened',
+    () async {
+      final platform = FakeLockbarPlatform()
+        ..permissionState = PermissionState.granted
+        ..bluetoothBatteryDevices = const [
+          BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 82),
+        ];
+      final trayClient = FakeTrayClient();
+      final controller = LockbarController(
+        platform: platform,
+        launchAtStartupService: FakeLaunchAtStartupService(),
+        localePreferencesService: FakeLocalePreferencesService(),
+        aiMemoryService: FakeAiMemoryService(),
+        aiInferenceClient: FakeAiInferenceClient(),
+        aiContextCollector: FakeAiContextCollector(),
+        initialSystemLocale: const Locale('en'),
+      );
+      final coordinator = LockbarDesktopCoordinator(
+        controller: controller,
+        platform: controller.platform,
+        trayClient: trayClient,
+      );
+
+      await controller.initialize();
+      await coordinator.showCommandPanelForTesting();
+
+      expect(
+        trayClient.contextMenu?.toJson().toString(),
+        contains('MX Master 3S  82%'),
+      );
+
+      platform.bluetoothBatteryDevices = const [
+        BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 81),
       ];
-    final controller = LockbarController(
-      platform: platform,
-      launchAtStartupService: FakeLaunchAtStartupService(),
-      localePreferencesService: FakeLocalePreferencesService(),
-      aiMemoryService: FakeAiMemoryService(),
-      aiInferenceClient: FakeAiInferenceClient(),
-      aiContextCollector: FakeAiContextCollector(),
-      initialSystemLocale: const Locale('en'),
-    );
-    final coordinator = LockbarDesktopCoordinator(
-      controller: controller,
-      platform: controller.platform,
-      trayClient: FakeTrayClient(),
-    );
+      await coordinator.showCommandPanelForTesting();
 
-    await controller.initialize();
-    await coordinator.showCommandPanelForTesting();
-
-    expect(platform.showCommandPanelCalls, 1);
-    expect(
-      platform.lastCommandPanelData?.bluetoothDevices.single.batteryLevel,
-      82,
-    );
-
-    platform.bluetoothBatteryDevices = const [
-      BluetoothBatteryDevice(name: 'MX Master 3S', batteryLevel: 81),
-    ];
-    await coordinator.syncCommandPanelForTesting();
-
-    expect(platform.updateCommandPanelCalls, 1);
-    expect(
-      platform.lastCommandPanelData?.bluetoothDevices.single.batteryLevel,
-      81,
-    );
-  });
+      expect(
+        trayClient.contextMenu?.toJson().toString(),
+        contains('MX Master 3S  81%'),
+      );
+    },
+  );
 }
